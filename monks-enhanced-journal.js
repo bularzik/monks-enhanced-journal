@@ -819,8 +819,9 @@ export class MonksEnhancedJournal {
 			let oldtype;
 			let types = MonksEnhancedJournal.getDocumentTypes();
 			if (types[this.type]) {
-				//oldtype = this.type;
-				//data.type = "text";
+				// core re-initializes page.type from _source ("text") when the parent
+				// JournalEntry is reset() after the update; restore it below
+				oldtype = this.type;
                 delete data.type;
 			}
 			let result = await wrapped(data, context);
@@ -4416,6 +4417,7 @@ Hooks.on("updateJournalEntry", (document, data, options, userId) => {
 
 Hooks.on("updateJournalEntryPage", (document, data, options, userId) => {
 	let type = foundry.utils.getProperty(document, 'flags.monks-enhanced-journal.type');
+	if (type) MonksEnhancedJournal.fixType(document);
 	if (type == 'quest')
 		MonksEnhancedJournal.refreshObjectives(true);
 
