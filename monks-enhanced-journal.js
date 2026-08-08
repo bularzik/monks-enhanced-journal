@@ -2338,6 +2338,9 @@ export class MonksEnhancedJournal {
 
 			MonksEnhancedJournal.fixType(doc);
 
+			if (setting("mej-only-types") && (doc instanceof JournalEntry || doc instanceof JournalEntryPage) && !MonksEnhancedJournal.getMEJType(doc))
+				return false;
+
 			let sheet = (!doc?._sheet ? doc?._getSheetClass() : doc?._sheet);
 			if ((sheet?.name || sheet?.constructor?.name) == 'QuestPreviewShim')
 				return false;

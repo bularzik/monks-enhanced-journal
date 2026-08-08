@@ -300,6 +300,15 @@ export const registerSettings = function () {
 		type: Boolean,
 	});
 
+	game.settings.register(modulename, "mej-only-types", {
+		name: i18n("MonksEnhancedJournal.mej-only-types.name"),
+		hint: i18n("MonksEnhancedJournal.mej-only-types.hint"),
+		scope: "world",
+		config: true,
+		default: false,
+		type: Boolean,
+	});
+
 	game.settings.register(modulename, "show-folder-sort", {
 		name: i18n("MonksEnhancedJournal.show-folder-sort.name"),
 		hint: i18n("MonksEnhancedJournal.show-folder-sort.hint"),
