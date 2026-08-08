@@ -42,9 +42,6 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
         let ctrls = [
             { id: 'lock', leftAlign: true, label: this.viewLockLabel, icon: this.viewLockIcon, visible: this.document.isEditable, action: "toggleLock" },
             { id: 'collapse-sidebar', leftAlign: true, label: this.viewCollapseLabel, icon: "fas fa-list", visible: !!this.enhancedjournal, action: "toggleSidebar" },
-            { label: '<i class="fas fa-search"></i>', type: 'text' },
-            //{ id: 'search-mode', label: this.searchModeLabel, icon: this.searchModeIcon, visible: !!this.enhancedjournal, action: "toggleSearch" },
-            { id: 'search', type: 'input', label: "Search", visible: !!this.enhancedjournal, callback: this.searchText },
             { id: 'show', label: i18n("MonksEnhancedJournal.ShowToPlayers"), icon: 'fas fa-eye', visible: game.user.isGM, action: "showPlayers" },
             { id: 'edit', label: i18n("MonksEnhancedJournal.EditDescription"), icon: 'fas fa-pencil-alt', visible: this.isEditable, action: "editObservedPage" },
             { id: 'add-page', label: i18n("JOURNAL.AddPage"), icon: 'fas fa-file-circle-plus', visible: this.document.isEditable, action: "createPage" },
@@ -366,14 +363,12 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
         }
 
         // Search
-        /*
         this.search ??= new foundry.applications.ux.SearchFilter({
             inputSelector: "search input",
             contentSelector: ".toc",
             callback: this._onSearchFilter.bind(this)
         });
         this.search.bind(this.trueElement);
-        */
     }
 
     async _renderAppV1PageView(element, sheet) {
@@ -854,16 +849,6 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
         page.update({ "text.content": modified });
     }
 
-    /*
-    searchText(query) {
-        this.filteredPages.clear();
-        const nameOnlySearch = this.searchMode === CONST.DIRECTORY_SEARCH_MODES.NAME;
-
-        // Match pages
-        let results = [];
-        if (!nameOnlySearch) results = this.entry.pages.search({ query });
-    }
-
     _onSearchFilter(event, query, rgx, html) {
         this.filteredPages.clear();
         const nameOnlySearch = this.searchMode === CONST.DIRECTORY_SEARCH_MODES.NAME;
@@ -879,7 +864,7 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
             if (match) this.filteredPages.add(page.id);
             el.hidden = !match;
         }
-    }*/
+    }
 
     static async onToggleLock() {
         let locked = !this.locked;
