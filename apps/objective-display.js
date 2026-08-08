@@ -158,7 +158,7 @@ export class ObjectiveDisplay extends HandlebarsApplicationMixin(ApplicationV2) 
         if (!options.properClose) {
             // closed via the window control: persist the toggle off so refreshObjectives doesn't reopen it
             await game.settings.set('monks-enhanced-journal', 'show-dialog', false);
-            ui.controls.render();
+            ui.controls.render({ reset: true });
         }
         MonksEnhancedJournal.objdisp = null;
         return super.close(options);
