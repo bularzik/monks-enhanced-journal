@@ -371,6 +371,10 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
             callback: this._onSearchFilter.bind(this)
         });
         this.search.bind(this.trueElement);
+
+        // the search box lives inside the sheet's submitOnChange form: swallow Enter so an
+        // implicit form submission doesn't fire a document update for a search interaction
+        $('.journal-search input', this.trueElement).on('keydown', (ev) => { if (ev.key === 'Enter') ev.preventDefault(); });
     }
 
     async _renderAppV1PageView(element, sheet) {
