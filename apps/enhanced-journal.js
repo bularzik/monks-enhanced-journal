@@ -1173,20 +1173,16 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     navigateHistory(event) {
-        if (!$(event.currentTarget).hasClass('disabled')) {
-            let dir = event.currentTarget.dataset.history;
-            let tab = this.tabs.active();
-
-            if (tab.history.length > 1) {
-                let result = true;
-                let idx = 0;
-                do {
-                    idx = ((tab.historyIdx == undefined ? 0 : tab.historyIdx) + (dir == 'back' ? 1 : -1));
-                    result = this.changeHistory(idx);
-                } while (!result && idx > 0 && idx < tab.history.length )
-            }
-        }
         event.preventDefault();
+        if ($(event.currentTarget).hasClass('disabled')) return;
+
+        const dir = event.currentTarget.dataset.history;
+        const tab = this.tabs.active();
+        if (!tab || !(tab.history?.length > 1)) return;
+
+        // changeHistory() is async; its boolean result was never observable here, so the
+        // former do/while retry loop could only ever run one pass. Navigate one step.
+        this.changeHistory((tab.historyIdx ?? 0) + (dir == 'back' ? 1 : -1));
     }
 
     async changeHistory(idx) {

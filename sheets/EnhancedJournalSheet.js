@@ -2594,24 +2594,6 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         let relationships = this.document.getFlag('monks-enhanced-journal', 'relationships') || {};
         relationships[li.dataset.id].hidden = !relationships[li.dataset.id].hidden;
         await this.document.setFlag('monks-enhanced-journal', 'relationships', relationships);
-
-
-        // Toggle 
-        let journal;
-        if (li.dataset.uuid) {
-            journal = await fromUuid(li.dataset.uuid);
-        } else {
-            journal = game.journal.get(li.dataset.id);
-        }
-        if (journal && (journal instanceof JournalEntryPage || journal.pages.size > 0)) {
-            let page = journal instanceof JournalEntryPage ? journal : journal.pages.contents[0];
-            let otherRelationships = foundry.utils.duplicate(foundry.utils.getProperty(page, "flags.monks-enhanced-journal.relationships") || {});
-            let otherRelationship = Object.values(otherRelationships).find(value => value.uuid == this.document.uuid || value.uuid == this.document.parent.uuid);
-            if (otherRelationship) {
-                otherRelationship.hidden = !otherRelationship.hidden;
-                page.setFlag('monks-enhanced-journal', "relationships", otherRelationships);
-            }
-        }
     }
 
     async addItem(data) {
@@ -2727,25 +2709,6 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             if (items[id]) {
                 items[id].hidden = !items[id].hidden;
                 await this.document.setFlag('monks-enhanced-journal', collection, items);
-            }
-
-            if (collection == "relationships") {
-                // Toggle 
-                let journal;
-                if (li.dataset.uuid) {
-                    journal = await fromUuid(li.dataset.uuid);
-                } else {
-                    journal = game.journal.get(li.dataset.id);
-                }
-                if (journal && (journal instanceof JournalEntryPage || journal.pages.size > 0)) {
-                    let page = journal instanceof JournalEntryPage ? journal : journal.pages.contents[0];
-                    let otherRelationships = foundry.utils.duplicate(foundry.utils.getProperty(page, "flags.monks-enhanced-journal.relationships") || {});
-                    let otherRelationship = Object.values(otherRelationships).find(value => value.uuid == this.document.uuid || value.uuid == this.document.parent.uuid);
-                    if (otherRelationship) {
-                        otherRelationship.hidden = items[id]?.hidden;
-                        page.setFlag('monks-enhanced-journal', "relationships", otherRelationships);
-                    }
-                }
             }
         }
     }

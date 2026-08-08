@@ -2376,7 +2376,7 @@ export class MonksEnhancedJournal {
 			if (allowed === false)
 				return false;
 		}
-		if (doc instanceof Actor && doc.type == "hazard") {
+		if (doc instanceof Actor) {
 			return false;
 		}
 
