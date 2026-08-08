@@ -2,3 +2,6 @@
 .svn/
 .playwright-mcp/
 .obsidian/
+test/node_modules/
+test/scratch/
+test/screenshots/
