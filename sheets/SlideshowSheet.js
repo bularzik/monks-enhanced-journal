@@ -287,12 +287,14 @@ export class SlideshowSheet extends EnhancedJournalSheet {
         }).observe(html);
 
         $('.add-slide', html).click(this.addSlide.bind(this));
-        $('.nav-button.play').click(this.playSlideshow.bind(this));
-        $('.nav-button.pause').click(this.pauseSlideshow.bind(this));
-        $('.nav-button.stop').click(this.stopSlideshow.bind(this));
+        $('.nav-button.play', html).click(this.playSlideshow.bind(this));
+        $('.nav-button.pause', html).click(this.pauseSlideshow.bind(this));
+        $('.nav-button.stop', html).click(this.stopSlideshow.bind(this));
 
         let size = ($('.slideshow-body .slide-textarea', html).outerWidth() || 182) / 50;
         $('.slideshow-body .slide-textarea', html).css({ 'font-size': `${size}px` });
+
+        this.updateButtons();
     }
 
     async close(options) {
