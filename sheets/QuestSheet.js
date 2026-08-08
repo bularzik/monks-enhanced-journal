@@ -628,21 +628,16 @@ export class QuestSheet extends EnhancedJournalSheet {
             for (let id of ids)
                 reordered[id] = objectives[id];
 
-            // setFlag/update diff & merge by value, not key order: an object-valued flag with the
-            // same key set and same per-key values (only reordered) diffs to "no change" and is
-            // silently skipped entirely (confirmed empirically — even update(..., {recursive:false})
-            // and update(..., {diff:false}) both no-op here, in-memory and server-side). Unset the
-            // flag first so the follow-up setFlag has no prior value to diff against and genuinely
-            // writes the new key order. If the setFlag fails after the unsetFlag succeeded (network
-            // blip, hook error, permission race), restore the pre-reorder value rather than leaving
-            // the flag deleted.
+            // setFlag/update diff & merge by value, not key order: a same-key same-value reorder diffs
+            // to "no change" and is silently dropped. ForcedReplacement is always retained by diffObject
+            // and committed without inner recursion, so the new key order lands verbatim in ONE write —
+            // no intermediate deleted-flag state (which used to blank the tab and the Quests HUD).
             try {
-                await this.document.unsetFlag('monks-enhanced-journal', 'objectives');
-                await this.document.setFlag('monks-enhanced-journal', 'objectives', reordered);
+                await this.document.setFlag('monks-enhanced-journal', 'objectives',
+                    new foundry.data.operators.ForcedReplacement(reordered));
             } catch (err) {
-                console.error("Monk's Enhanced Journal | failed to persist objective reorder, restoring previous order", err);
-                ui.notifications.error("Failed to reorder objectives — original order restored");
-                await this.document.setFlag('monks-enhanced-journal', 'objectives', objectives).catch(() => {});
+                console.error("Monk's Enhanced Journal | failed to persist objective reorder", err);
+                ui.notifications.error("Failed to reorder objectives — original order unchanged");
             }
         } else if (data.type == 'Folder') {
             if (!this.document.isOwner)
