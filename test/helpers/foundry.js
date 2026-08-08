@@ -37,10 +37,15 @@ export async function ensureServer() {
 // Join page: templates/views/join.hbs; "Return to Setup" form has input[name="adminPassword"]
 // (no admin password is set). Setup page world tiles: [data-package-id] with
 // a.control.play[data-action="worldLaunch"] (templates/setup/parts/package-tiles.hbs:18).
+// Foundry refuses to run properly (and logs a console.error on every load)
+// below this resolution — keep every context at least this large so specs
+// that assert a clean console aren't tripped up by an unrelated warning.
+const VIEWPORT = { width: 1366, height: 768 };
+
 async function ensureWorld(browser, worldId) {
   const status = await apiStatus();
   if (status?.world === worldId) return;
-  const context = await browser.newContext();
+  const context = await browser.newContext({ viewport: VIEWPORT });
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
   try {
@@ -51,7 +56,17 @@ async function ensureWorld(browser, worldId) {
     } else {
       await page.goto(`${BASE}/setup`);
     }
-    await page.click(`[data-package-id="${worldId}"] [data-action="worldLaunch"]`);
+    // A first-run "welcome tour" (e.g. "Backups Overview") can render a
+    // full-page overlay on /setup that intercepts every click, and the
+    // world tile's own play icon is `visibility:hidden` until the tile is
+    // hovered — so wait for the tile, dismiss any tour, hover, then click.
+    const tile = `[data-package-id="${worldId}"]`;
+    await page.waitForSelector(tile, { timeout: 30_000 });
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.locator('.tour-center-step [data-action="exit"]').first()
+      .click({ timeout: 2_000 }).catch(() => {});
+    await page.locator(tile).hover();
+    await page.click(`${tile} [data-action="worldLaunch"]`);
     await page.waitForURL('**/join**', { timeout: 60_000 }); // may migrate on first launch
   } finally {
     await context.close();
@@ -73,7 +88,7 @@ async function ensureWorld(browser, worldId) {
 // dispatch 'change') instead of selectOption(), which works regardless of the
 // disabled flag.
 async function join(browser, session, userName) {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ viewport: VIEWPORT });
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
   const log = [];
