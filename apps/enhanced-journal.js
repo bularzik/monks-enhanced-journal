@@ -277,7 +277,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     _getHeaderControls() {
-        let controls = this.subsheet?._getHeaderControls?.() || [];
+        let controls = (this.options.window.controls || []).concat(this.subsheet?._getHeaderControls?.() || []);
         let maximized = this.element?.classList.contains("maximized");
         return controls.concat([{
             icon: maximized ? "fas fa-compress-arrows-alt" : "fas fa-expand-arrows-alt",
