@@ -4563,7 +4563,7 @@ Hooks.on('dropJournalSheetData', (journal, sheet, data) => {
 			const cls = (page._getSheetClass ? page._getSheetClass() : null);
 			if (cls && cls.itemDropped) {
 				cls.itemDropped.call(cls, data.itemId, journal, page).then((result) => {
-					if (!!result) {
+					if ((result?.quantity ?? 0) > 0) {
 						let itemQty = getValue(data.data, quantityname());
 						setValue(data.data, quantityname(), result.quantity * itemQty);
 						data.uuid = `${data.uuid}.Items.${data.itemId}`;

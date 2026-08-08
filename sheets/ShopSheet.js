@@ -757,9 +757,11 @@ export class ShopSheet extends EnhancedJournalSheet {
                 if (game.user.isGM) {
                     ShopSheet.actorPurchase.call(entry, actor, { value: (price.value * result.quantity), currency: price.currency });
                     ShopSheet.purchaseItem.call(this, entry, id, result.quantity, { actor, purchased: true });
+                    this.addLog.call(entry, { actor: actor.name, item: item.name, quantity: result.quantity, price: result.price.value + " " + result.price.currency, type: 'purchase' });
+                    // consumables are used at the point of sale: charged and stock-decremented above,
+                    // but quantity 0 tells the drop handlers not to add the item to the buyer's inventory
                     if (item.consumable)
                         result.quantity = 0;
-                    this.addLog.call(entry, { actor: actor.name, item: item.name, quantity: result.quantity, price: result.price.value + " " + result.price.currency, type: 'purchase' });
                     return result;
                 } else {
                     if (foundry.utils.getProperty(entry, "flags.monks-enhanced-journal.purchasing") == 'confirm') {
