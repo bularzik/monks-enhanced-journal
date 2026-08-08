@@ -42,6 +42,8 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
         let ctrls = [
             { id: 'lock', leftAlign: true, label: this.viewLockLabel, icon: this.viewLockIcon, visible: this.document.isEditable, action: "toggleLock" },
             { id: 'collapse-sidebar', leftAlign: true, label: this.viewCollapseLabel, icon: "fas fa-list", visible: !!this.enhancedjournal, action: "toggleSidebar" },
+            { label: '<i class="fas fa-search"></i>', type: 'text' },
+            { id: 'search', type: 'input', label: "Search", visible: !!this.enhancedjournal, callback: this.searchText },
             { id: 'show', label: i18n("MonksEnhancedJournal.ShowToPlayers"), icon: 'fas fa-eye', visible: game.user.isGM, action: "showPlayers" },
             { id: 'edit', label: i18n("MonksEnhancedJournal.EditDescription"), icon: 'fas fa-pencil-alt', visible: this.isEditable, action: "editObservedPage" },
             { id: 'add-page', label: i18n("JOURNAL.AddPage"), icon: 'fas fa-file-circle-plus', visible: this.document.isEditable, action: "createPage" },
