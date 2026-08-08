@@ -89,7 +89,7 @@ export class SlideshowSheet extends EnhancedJournalSheet {
 
         context.playControls = true;
 
-        context.fontOptions = foundry.utils.mergeObject({ "": "" }, MonksEnhancedJournal.fonts);
+        context.fontOptions = foundry.utils.mergeObject({ "": "" }, foundry.applications.settings.menus.FontConfig.getAvailableFontChoices());
 
         let flags = (context.data.flags["monks-enhanced-journal"]);
         if (flags == undefined) {

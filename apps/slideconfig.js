@@ -79,7 +79,7 @@ export class SlideConfig extends HandlebarsApplicationMixin(ApplicationV2) {
             };
         context.effectOptions = Object.assign({ '': i18n("MonksEnhancedJournal.InheritFromSlideshow") }, MonksEnhancedJournal.effectTypes);
 
-        context.fontOptions = foundry.utils.mergeObject({ "": "" }, MonksEnhancedJournal.fonts);
+        context.fontOptions = foundry.utils.mergeObject({ "": "" }, foundry.applications.settings.menus.FontConfig.getAvailableFontChoices());
 
         let windowSize = 25;
         let windowFont = $(".window-content", this.element).css("font-family");
