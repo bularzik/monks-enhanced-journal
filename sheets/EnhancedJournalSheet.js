@@ -1511,7 +1511,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             });
         }
         if (this.document.id)
-            ctrls.push({ id: 'locate', label: i18n("SIDEBAR.JumpPin"), icon: 'fas fa-crosshairs', visible: game.user.isGM, attr: { "page-id": this.document.id, "journal-id": this.document.parent?.id }, action: "findMapEntry" });
+            ctrls.push({ id: 'locate', label: i18n("SIDEBAR.JumpPin"), icon: 'fas fa-crosshairs', visible: !!this.document.sceneNote, attr: { "page-id": this.document.id, "journal-id": this.document.parent?.id }, action: "findMapEntry" });
         let defaultSettings = (game.settings.settings.get("monks-enhanced-journal.sheet-settings")?.default || {})[this.constructor.type];
         if (defaultSettings != undefined && Object.keys(defaultSettings).length > 0)
             ctrls.push({ id: 'settings', label: i18n("MonksEnhancedJournal.EditFields"), icon: 'fas fa-cog', visible: game.user.isGM, action: "editFields" });
