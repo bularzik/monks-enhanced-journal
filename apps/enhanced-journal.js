@@ -119,7 +119,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         options = super._initializeApplicationOptions(options);
 
         const { colorScheme } = game.settings.get("core", "uiConfig");
-        options.classes.push("themed", `theme-${colorScheme.applications || "dark"}`);
+        const userTheme = game.user.getFlag("monks-enhanced-journal", "themes.enhancedjournal");
+        options.classes.push("themed", `theme-${userTheme || colorScheme.applications || "dark"}`);
 
         if (game.modules.get("rippers-ui")?.active)
             options.classes.push('rippers-ui');
