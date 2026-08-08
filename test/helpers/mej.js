@@ -7,8 +7,8 @@ import { connect } from './foundry.js';
 export async function withSession(name, opts, fn) {
   const session = await connect(opts);
   const gm = session.pages['Gamemaster'];
-  if (gm) await sweep(gm);
   try {
+    if (gm) await sweep(gm);
     await fn(session);
   } catch (e) {
     for (const [user, page] of Object.entries(session.pages)) {
@@ -19,7 +19,7 @@ export async function withSession(name, opts, fn) {
     throw e;
   } finally {
     try { if (gm) await sweep(gm); } catch {}
-    await session.close();
+    try { await session.close(); } catch (e) { console.error(`withSession: session.close() failed: ${e.stack}`); }
   }
 }
 
