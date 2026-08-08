@@ -971,7 +971,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         else if (typeof tab == 'number')
             tab = this.tabs[tab];
 
-        if (event?.altKey) {
+        if (MonksEnhancedJournal.altOpensOutside(event)) {
             // Open this outside of the Enhnaced Journal
             let document = await this.findEntity(tab?.entityId, tab?.text);
             if (document) {
