@@ -420,7 +420,7 @@ export class EncounterSheet extends EnhancedJournalSheet {
         if (Object.keys(foundry.utils.getProperty(this.document, "flags.monks-enhanced-journal.actors") || {}).length == 0) {
             return ui.notifications.warn(i18n("MonksEnhancedJournal.msg.NoMonstersInEncounter"));
         }
-        let template = await (EncounterTemplate.fromEncounter(this))?.drawPreview();
+        let template = await (EncounterTemplate.fromEncounter(this))?.drawPreview().catch(() => null);
         if (template) {
             EncounterSheet.createEncounter.call(this.document, template, { combat });
         }
