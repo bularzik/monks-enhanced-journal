@@ -5,6 +5,7 @@
         {{/if}}
         <div class="item-name">{{localize 'MonksEnhancedJournal.Name'}}</div>
         <div class="item-detail">{{localize 'MonksEnhancedJournal.Shown'}}</div>
+        <div class="item-detail">{{localize 'MonksEnhancedJournal.HideFromPlayers'}}</div>
         {{#if @root.generalEdit}}
         <div class="item-detail">{{localize 'MonksEnhancedJournal.Full'}}</div>
         <div class="controls">
@@ -32,6 +33,9 @@
 
             <div class="item-detail">
                 <input type="checkbox" name="sheetSettings.{{../type}}.attributes.{{attribute.id}}.shown" class="attribute" {{checked attribute.shown}} />
+            </div>
+            <div class="item-detail">
+                <input type="checkbox" name="sheetSettings.{{../type}}.attributes.{{attribute.id}}.playerHidden" class="attribute" {{checked attribute.playerHidden}} />
             </div>
             {{#if @root.generalEdit}}
             <div class="item-detail">

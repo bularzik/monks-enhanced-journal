@@ -300,6 +300,8 @@
   "MonksEnhancedJournal.Grant": "Grant",
   "MonksEnhancedJournal.Hidden": "Hidden",
   "MonksEnhancedJournal.Shown": "Shown",
+  "MonksEnhancedJournal.HideFromPlayers": "Hide from Players",
+  "MonksEnhancedJournal.HiddenFromPlayers": "Hidden from players",
   "MonksEnhancedJournal.Players": "Players",
   "MonksEnhancedJournal.Offer": "Offer",
   "MonksEnhancedJournal.RemoveRelationship": "Remove Relationship",
