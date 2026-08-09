@@ -167,6 +167,7 @@
     --mej-sidebar-document-color: var(--mej-color-form-label);
     --mej-sidebar-document-border-top: rgb(195, 193, 182);
     --mej-sidebar-document-border-botom: rgb(154, 152, 144);
+    --mej-sidebar-permissions-background: rgba(255, 255, 255, 0.5);
     --mej-adventure-toc-background: url(../../../ui/denim075.png) repeat;
     --mej-adventure-toc-item-background: rgba(0, 0, 0, 0.4);
     --mej-adventure-toc-border-highlight: var(--color-border-highlight);
@@ -836,7 +837,7 @@
 }
 
 .monks-enhanced-journal .directory .directory-item.journalentry .permissions {
-    background-color: rgba(255, 255, 255, 0.5);
+    background-color: var(--mej-sidebar-permissions-background);
 }
 
 .directory .directory-item.journalentry .permissions i {
@@ -1955,6 +1956,7 @@ body.theme-light #list-item-edit .items-list header {
     --mej-sidebar-document-color: var(--mej-color-form-label);
     --mej-sidebar-document-border-top: rgb(75, 74, 66);
     --mej-sidebar-document-border-botom: rgb(65, 64, 58);
+    --mej-sidebar-permissions-background: rgba(0, 0, 0, 0.5);
 
     /* Adventure table of contents */
     --mej-adventure-toc-background: rgb(30, 29, 32);
