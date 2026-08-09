@@ -1815,3 +1815,153 @@ body.theme-light #list-item-edit .items-list header {
     text-decoration: line-through;
     color: var(--mej-sheet-header-underline);
 }
+
+/* ============================================================
+   Dark theme: override the palette variables when core's color
+   scheme is dark. The light theme keeps the :root defaults above
+   untouched. Every --mej-* variable from :root was evaluated;
+   variables not listed here are intentionally left alone because
+   they are theme-neutral (ramp bases, aliases that resolve through
+   an overridden variable, layout-only values, saturated/semantic
+   accent colors, or values scoped to contexts outside this
+   selector) - see task-9-report.md for the full var-by-var list.
+   ============================================================ */
+.monks-enhanced-journal.theme-dark,
+.monks-journal-sheet.theme-dark {
+    /* Base palette */
+    --mej-cream: rgba(38, 37, 33, 0.85);
+    --mej-color-form-label: rgb(var(--mej-light-2));
+    --mej-placeholder-color: rgba(var(--mej-light-7), 0.7);
+    --mej-background: rgb(28, 27, 24);
+
+    /* Header / tab bar / bookmarks */
+    --mej-header-border-color: rgb(90, 90, 90);
+    --mej-header-background: rgb(48, 48, 48);
+    --mej-header-color: var(--mej-color-form-label);
+    --mej-header-tab-color: var(--mej-header-color);
+    --mej-header-tab-btn-color: rgb(170, 168, 160);
+    --mej-header-tab-background: rgba(20, 20, 18, 0.5);
+    --mej-header-tab-border: 1px solid rgb(85, 84, 76);
+    --mej-header-tab-active: rgba(60, 60, 56, 0.9);
+    --mej-header-bookmark-color: var(--mej-header-color);
+    --mej-header-bookmark-background: rgba(0, 0, 0, 0.3);
+    --mej-header-bookmark-border: rgb(90, 90, 90);
+    --mej-header-bookmark-hover: rgba(255, 255, 255, 0.1);
+    --mej-header-add-bookmark-background: var(--mej-header-bookmark-background);
+    --mej-header-add-bookmark-border: var(--mej-header-bookmark-border);
+    --mej-header-add-bookmark-color: var(--mej-header-bookmark-color);
+    --mej-header-add-bookmark-hover: var(--mej-header-bookmark-hover);
+    --mej-header-nav-color: var(--mej-header-color);
+    --mej-header-nav-background: rgb(44, 43, 40);
+    --mej-header-nav-btn-background: var(--mej-cream);
+    --mej-header-nav-btn-border: rgb(90, 90, 90);
+    --mej-header-nav-btn-disabled: rgb(110, 110, 110);
+    --mej-header-nav-btn-background-hover: var(--mej-header-nav-btn-background);
+    --mej-header-nav-input-border: rgb(100, 99, 90);
+    --mej-header-nav-input-background: rgba(255, 255, 255, 0.05);
+    --mej-header-nav-input-color: rgb(230, 228, 220);
+    --mej-header-nav-input-placeholder-color: var(--mej-placeholder-color);
+    --mej-header-nav-input-focus-background: rgba(255, 255, 255, 0.12);
+    --mej-header-nav-input-focus-border: rgb(140, 138, 128);
+    --mej-header-nav-input-focus-color: var(--mej-header-nav-input-color);
+    --mej-header-nav-vertical-line: rgb(70, 69, 62);
+
+    /* Footer */
+    --mej-footer-color: var(--mej-color-form-label);
+    --mej-footer-background: rgb(44, 43, 40);
+    --mej-footer-border: rgb(90, 90, 90);
+    --mej-footer-btn-background: var(--mej-cream);
+    --mej-footer-btn-background-hover: var(--mej-footer-btn-background);
+    --mej-footer-btn-border: rgb(90, 90, 90);
+    --mej-footer-btn-disabled: rgb(110, 110, 110);
+
+    /* Sheet header */
+    --mej-sheet-color: var(--mej-color-form-label);
+    --mej-sheet-header-input-color: var(--mej-color-form-label);
+    --mej-sheet-header-name-color: var(--mej-sheet-header-input-color);
+    --mej-sheet-header-input-border: 1px solid rgb(100, 99, 90);
+    --mej-sheet-header-input-background: rgba(255, 255, 255, 0.08);
+    --mej-sheet-header-label-color: rgb(180, 178, 168);
+    --mej-sheet-header-button-color: rgba(var(--mej-light-5), 0.7);
+    --mej-sheet-header-button-background: rgba(255, 255, 255, 0.1);
+    --mej-sheet-header-detail-input-color: rgb(230, 228, 220);
+    --mej-sheet-header-search-color: var(--mej-sheet-header-input-color);
+    --mej-sheet-header-search-placeholder: var(--mej-placeholder-color);
+    --mej-sheet-header-search-background: var(--mej-sheet-header-input-background);
+    --mej-sheet-header-search-background-hover: var(--mej-sheet-header-input-background);
+    --mej-sheet-detailed-header-border: rgb(70, 69, 62);
+
+    /* Sheet tabs / page controls / inputs */
+    --mej-sheet-tab-color: var(--mej-sheet-color);
+    --mej-sheet-tab-color-active: var(--mej-sheet-tab-color);
+    --mej-sheet-tab-background: rgba(255, 255, 255, 0.15);
+    --mej-sheet-tab-bottom-border: rgb(70, 69, 62);
+    --mej-sheet-tab-border: 3px solid rgb(85, 84, 76);
+    --mej-sheet-page-control-color: var(--mej-sheet-color);
+    --mej-sheet-page-control-background: rgb(70, 69, 63);
+    --mej-sheet-page-control-background-hover: var(--mej-sheet-page-control-background);
+    --mej-sheet-details-section-border: rgb(70, 69, 62);
+    --mej-sheet-input-border: 1px solid rgb(100, 99, 90);
+    --mej-sheet-input-background: rgba(255, 255, 255, 0.05);
+    --mej-sheet-input-color: var(--mej-color-form-label);
+
+    /* Item lists */
+    --mej-itemlist-background: rgba(255, 255, 255, 0.05);
+    --mej-itemlist-colour: rgb(170, 168, 158);
+    --mej-itemlist-border: rgb(70, 69, 62);
+    --mej-itemlist-item-border: rgb(75, 74, 66);
+    --mej-itemlist-item-name: rgb(230, 228, 220);
+    --mej-itemlist-item-content: rgb(var(--mej-light-3));
+    --mej-itemlist-item-disabled: rgb(140, 140, 140);
+    --mej-itemlist-alternate-row: rgba(255, 255, 255, 0.06);
+    --mej-itemlist-control-background: rgba(255, 255, 255, 0.12);
+    --mej-itemlist-control-border: rgb(90, 90, 90);
+    --mej-itemlist-control-color: var(--mej-itemlist-colour);
+    --mej-itemlist-control-color-hover: var(--mej-itemlist-colour);
+    --mej-itemlist-header-color: var(--mej-itemlist-colour);
+    --mej-itemlist-header-control-color: var(--mej-itemlist-colour);
+    --mej-itemlist-input-color: rgb(230, 228, 220);
+    --mej-itemlist-input-background: rgba(255, 255, 255, 0.05);
+
+    /* Slideshow / currency */
+    --mej-slideshow-add-slide: rgba(255, 255, 255, 0.35);
+    --mej-currency-background: rgba(var(--mej-dark-5), 0.5);
+
+    /* Instruction text / icon frame / blank state */
+    --mej-instruction: rgb(160, 160, 160);
+    --mej-icon-background: rgba(50, 49, 45, 1);
+    --mej-icon-outline: rgba(255, 255, 255, 0.3);
+    --mej-blank-color: rgba(255, 255, 255, 0.6);
+    --mej-blank-recent-background: rgba(255, 255, 255, 0.12);
+    --mej-blank-recent-border: rgba(255, 255, 255, 0.2);
+    --mej-blank-link-hover: rgba(255, 255, 255, 0.9);
+
+    /* Sidebar / directory / folders */
+    --mej-sidebar-background: var(--mej-background);
+    --mej-sidebar-button-background: rgba(255, 255, 255, 0.08);
+    --mej-sidebar-button-border: rgb(70, 69, 62);
+    --mej-sidebar-input-border: rgb(90, 90, 90);
+    --mej-sidebar-input-background: var(--mej-cream);
+    --mej-sidebar-input-background-focus: var(--mej-cream);
+    --mej-sidebar-input-color: var(--color-form-label);
+    --mej-sidebar-input-placeholder-color: var(--mej-placeholder-color);
+    --mej-sidebar-folder-border-collapsed: rgb(80, 79, 72);
+    --mej-sidebar-folder-border: rgb(60, 59, 54);
+    --mej-sidebar-folder-background-collapsed: rgb(58, 58, 55);
+    --mej-sidebar-folder-background: rgb(50, 49, 45);
+    --mej-sidebar-folder-color-collapsed: rgb(var(--mej-light-3));
+    --mej-sidebar-folder-context-color: var(--mej-color-form-label);
+    --mej-sidebar-subfolder-border: rgb(75, 74, 68);
+    --mej-sidebar-document-color: var(--mej-color-form-label);
+    --mej-sidebar-document-border-top: rgb(75, 74, 66);
+    --mej-sidebar-document-border-botom: rgb(65, 64, 58);
+
+    /* Adventure table of contents */
+    --mej-adventure-toc-background: rgb(30, 29, 32);
+    --mej-adventure-toc-item-background: rgba(255, 255, 255, 0.08);
+
+    /* Sheet buttons */
+    --mej-sheet-button-background: rgb(70, 69, 63);
+    --mej-sheet-button-background-hover: var(--mej-sheet-button-background);
+    --mej-sheet-button-color: var(--mej-sheet-color);
+}
