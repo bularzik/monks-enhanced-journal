@@ -1898,6 +1898,7 @@ body.theme-light #list-item-edit .items-list header {
     --mej-sheet-tab-background: rgba(255, 255, 255, 0.15);
     --mej-sheet-tab-bottom-border: rgb(70, 69, 62);
     --mej-sheet-tab-border: 3px solid rgb(85, 84, 76);
+    --mej-sheet-tab-border-active: rgb(68, 25, 26);
     --mej-sheet-page-control-color: var(--mej-sheet-color);
     --mej-sheet-page-control-background: rgb(70, 69, 63);
     --mej-sheet-page-control-background-hover: var(--mej-sheet-page-control-background);
@@ -1953,6 +1954,7 @@ body.theme-light #list-item-edit .items-list header {
     --mej-sidebar-folder-color-collapsed: rgb(var(--mej-light-3));
     --mej-sidebar-folder-context-color: var(--mej-color-form-label);
     --mej-sidebar-subfolder-border: rgb(75, 74, 68);
+    --mej-sidebar-label-color: var(--mej-color-form-label);
     --mej-sidebar-document-color: var(--mej-color-form-label);
     --mej-sidebar-document-border-top: rgb(75, 74, 66);
     --mej-sidebar-document-border-botom: rgb(65, 64, 58);
