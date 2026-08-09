@@ -351,7 +351,7 @@ export class ShopSheet extends EnhancedJournalSheet {
                         let origPrice = price.value;
                         let origCurrency = price.currency;
                         let adjustment = this.sheetSettings()?.adjustment || {};
-                        let buy = adjustment[item.type]?.buy ?? adjustment.default.buy ?? 0.5;
+                        let buy = ShopSheet.adjustmentRate(adjustment, item, "buy");
                         if (buy == -1)
                             return ui.notifications.warn(i18n("MonksEnhancedJournal.msg.CannotSellItem"));
                         let converted = distributeCurrency(price.value * buy, price.currency, MonksEnhancedJournal.currencies);
@@ -400,7 +400,7 @@ export class ShopSheet extends EnhancedJournalSheet {
                         let origPrice = price.value;
                         let origCurrency = price.currency;
                         let adjustment = this.sheetSettings()?.adjustment || {};
-                        let buy = adjustment[item.type]?.buy ?? adjustment.default.buy ?? 0.5;
+                        let buy = ShopSheet.adjustmentRate(adjustment, item, "buy");
                         if (buy == -1)
                             return ui.notifications.warn(i18n("MonksEnhancedJournal.msg.CannotSellItem"));
                         let converted = distributeCurrency(price.value * buy, price.currency, MonksEnhancedJournal.currencies);
@@ -623,7 +623,7 @@ export class ShopSheet extends EnhancedJournalSheet {
         let data = foundry.utils.getProperty(item, "flags.monks-enhanced-journal");
         let price = MEJHelpers.getPrice(data.price);
         let adjustment = this.sheetSettings()?.adjustment || {};
-        let buy = adjustment[item.type]?.buy ?? adjustment.default.buy ?? 0.5;
+        let buy = ShopSheet.adjustmentRate(adjustment, item, "buy");
         let converted = distributeCurrency(price.value * buy, price.currency, MonksEnhancedJournal.currencies);
         // never let a nonzero buy price truncate to free; pay 1 of the lowest denomination instead
         if (price.value * buy > 0 && converted.value == 0)
@@ -682,6 +682,13 @@ export class ShopSheet extends EnhancedJournalSheet {
 
         if (item)
             return item.sheet.render(true);
+    }
+
+    static adjustmentRate(adjustment, item, kind) {
+        // kind: "buy" = shop buying back from a player (fallback 0.5),
+        //       "sell" = shop selling to a player (fallback 1)
+        let fallback = kind == "buy" ? 0.5 : 1;
+        return adjustment[item.type]?.[kind] ?? adjustment.default?.[kind] ?? fallback;
     }
 
     static canAfford(item, actor) {
@@ -889,7 +896,7 @@ export class ShopSheet extends EnhancedJournalSheet {
         let items = this.document.getFlag('monks-enhanced-journal', 'items') || {};
 
         for (let item of Object.values(items)) {
-            let sell = adjustment[item.type]?.sell ?? adjustment.default.sell ?? 1;
+            let sell = ShopSheet.adjustmentRate(adjustment, item, "sell");
             let price = MEJHelpers.getPrice(foundry.utils.getProperty(item, "flags.monks-enhanced-journal.price"));
             let converted = distributeCurrency(price.value * sell, price.currency, MonksEnhancedJournal.currencies);
             // never let a priced item become free after conversion; charge 1 of the lowest denomination instead
