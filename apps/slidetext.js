@@ -70,7 +70,7 @@ export class SlideText extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _prepareBodyContext(context, options) {
         let windowSize = 25;
-        let fontOptions = foundry.utils.mergeObject({ "": "" }, MonksEnhancedJournal.fonts);
+        let fontOptions = foundry.utils.mergeObject({ "": "" }, foundry.applications.settings.menus.FontConfig.getAvailableFontChoices());
 
         let journalFont = foundry.utils.getProperty(this.options.journalentry, "flags.monks-enhanced-journal.font") || {};
         let slideFont = foundry.utils.getProperty(this.options.slideconfig.document, "font") || {};
