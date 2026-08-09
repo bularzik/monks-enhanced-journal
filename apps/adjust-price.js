@@ -21,7 +21,9 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
         actions: {
             cancel: AdjustPrice.onClose,
             reset: AdjustPrice.resetValues,
-            convert: AdjustPrice.convertItems
+            convert: AdjustPrice.convertItems,
+            addTier: AdjustPrice.onAddTier,
+            removeTier: AdjustPrice.onRemoveTier
         },
         position: { width: 400 },
         form: {
@@ -68,7 +70,13 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
         // Get the default adjustment settings, and set the current adjustment settings to default
         let defaultAdjustment = setting("adjustment-defaults");
 
-        let adjustments = foundry.utils.duplicate(this.document.getFlag('monks-enhanced-journal', 'adjustment') || {});
+        let adjustments = foundry.utils.duplicate(this.document ? (this.document.getFlag('monks-enhanced-journal', 'adjustment') || {}) : (defaultAdjustment || {}));
+
+        // the stored priceTiers key must not become a bogus type row below; prefer any
+        // unsaved edits collected across an addTier/removeTier re-render
+        let priceTiers = this._tiers ?? (adjustments.priceTiers || []);
+        delete adjustments.priceTiers;
+
         for (let t of Object.keys(types)) {
             let adj = adjustments[t] || { sell: null, buy: null };
             let defValue = defaultAdjustment[t] || { sell: null, buy: null };
@@ -87,6 +95,7 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
 
         return foundry.utils.mergeObject(context, {
             adjustments,
+            priceTiers,
             showConvert: !!this.options.document
         });
     }
@@ -139,6 +148,40 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    static onAddTier(event, target) {
+        this._tiers = this._collectTiers();
+        this._tiers.push({ threshold: null, sell: null, buy: null });
+        this.render();
+    }
+
+    static onRemoveTier(event, target) {
+        let idx = parseInt(target.closest("[data-tier-idx]").dataset.tierIdx);
+        this._tiers = this._collectTiers();
+        this._tiers.splice(idx, 1);
+        this.render();
+    }
+
+    _collectTiers() {
+        // read live form inputs so unsaved edits survive add/remove re-renders
+        return Array.from(this.element.querySelectorAll("[data-tier-idx]")).map(row => ({
+            threshold: row.querySelector("[name$='.threshold']")?.valueAsNumber ?? null,
+            sell: row.querySelector("[name$='.sell']")?.valueAsNumber ?? null,
+            buy: row.querySelector("[name$='.buy']")?.valueAsNumber ?? null,
+        })).map(t => ({
+            threshold: Number.isNaN(t.threshold) ? null : t.threshold,
+            sell: Number.isNaN(t.sell) ? null : t.sell,
+            buy: Number.isNaN(t.buy) ? null : t.buy,
+        }));
+    }
+
+    // priceTiers live as a sibling of `adjustment` in the expanded form data (not nested
+    // under it); returns the sorted/filtered array ready to attach at `adjustment.priceTiers`
+    static _extractTiers(expandedData) {
+        return Object.values(expandedData.priceTiers || {})
+            .filter(t => t.threshold != undefined && t.threshold !== null && t.threshold !== "")
+            .sort((a, b) => a.threshold - b.threshold);
+    }
+
     static async onSubmitForm(event, form, formData) {
         let submitData = foundry.utils.expandObject(formData.object);
         for (let [k, v] of Object.entries(submitData.adjustment)) {
@@ -151,9 +194,19 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
                 delete submitData.adjustment[k];
         }
 
+        foundry.utils.setProperty(submitData.adjustment, "priceTiers", AdjustPrice._extractTiers(submitData));
+
         if (this.options.document) {
             await this.options.document.unsetFlag('monks-enhanced-journal', 'adjustment');
             await this.options.document.setFlag('monks-enhanced-journal', 'adjustment', submitData.adjustment);
+            // Bridge to the flag namespace the live buy/sell call sites actually read
+            // (ShopSheet#sheetSettings() -> flags.monks-enhanced-journal.sheet-settings.adjustment).
+            // ShopSheet.js's one-time migration only copies flags.adjustment -> sheet-settings.adjustment
+            // the first time a shop is rendered and never resyncs after that, so without this the
+            // dialog's edits (including these price tiers) would silently never reach the live
+            // player-sell/buy-back flow for any shop that already went through that migration.
+            await this.options.document.unsetFlag('monks-enhanced-journal', 'sheet-settings.adjustment');
+            await this.options.document.setFlag('monks-enhanced-journal', 'sheet-settings.adjustment', submitData.adjustment);
         } else
             await game.settings.set("monks-enhanced-journal", "adjustment-defaults", submitData.adjustment, { diff: false });
     }
@@ -161,6 +214,8 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
     static async convertItems(event, target) {
         const fd = new foundry.applications.ux.FormDataExtended(this.element);
         let data = foundry.utils.expandObject(fd.object);
+
+        foundry.utils.setProperty(data.adjustment, "priceTiers", AdjustPrice._extractTiers(data));
 
         this.options.journalsheet.convertItems(data);
 

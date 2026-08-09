@@ -351,7 +351,7 @@ export class ShopSheet extends EnhancedJournalSheet {
                         let origPrice = price.value;
                         let origCurrency = price.currency;
                         let adjustment = this.sheetSettings()?.adjustment || {};
-                        let buy = adjustment[item.type]?.buy ?? adjustment.default.buy ?? 0.5;
+                        let buy = ShopSheet.adjustmentRate(adjustment, item, "buy", price);
                         if (buy == -1)
                             return ui.notifications.warn(i18n("MonksEnhancedJournal.msg.CannotSellItem"));
                         let converted = distributeCurrency(price.value * buy, price.currency, MonksEnhancedJournal.currencies);
@@ -400,7 +400,7 @@ export class ShopSheet extends EnhancedJournalSheet {
                         let origPrice = price.value;
                         let origCurrency = price.currency;
                         let adjustment = this.sheetSettings()?.adjustment || {};
-                        let buy = adjustment[item.type]?.buy ?? adjustment.default.buy ?? 0.5;
+                        let buy = ShopSheet.adjustmentRate(adjustment, item, "buy", price);
                         if (buy == -1)
                             return ui.notifications.warn(i18n("MonksEnhancedJournal.msg.CannotSellItem"));
                         let converted = distributeCurrency(price.value * buy, price.currency, MonksEnhancedJournal.currencies);
@@ -623,7 +623,7 @@ export class ShopSheet extends EnhancedJournalSheet {
         let data = foundry.utils.getProperty(item, "flags.monks-enhanced-journal");
         let price = MEJHelpers.getPrice(data.price);
         let adjustment = this.sheetSettings()?.adjustment || {};
-        let buy = adjustment[item.type]?.buy ?? adjustment.default.buy ?? 0.5;
+        let buy = ShopSheet.adjustmentRate(adjustment, item, "buy", price);
         let converted = distributeCurrency(price.value * buy, price.currency, MonksEnhancedJournal.currencies);
         // never let a nonzero buy price truncate to free; pay 1 of the lowest denomination instead
         if (price.value * buy > 0 && converted.value == 0)
@@ -682,6 +682,25 @@ export class ShopSheet extends EnhancedJournalSheet {
 
         if (item)
             return item.sheet.render(true);
+    }
+
+    static adjustmentRate(adjustment, item, kind, price) {
+        // kind: "buy" = shop buying back from a player (fallback 0.5),
+        //       "sell" = shop selling to a player (fallback 1)
+        // Resolution: explicit item-type override, then highest matching price tier
+        // (threshold in default-currency units), then the default rate.
+        let fallback = kind == "buy" ? 0.5 : 1;
+        let typeRate = adjustment[item.type]?.[kind];
+        if (typeRate != undefined)
+            return typeRate;
+        let tiers = (adjustment.priceTiers || []).filter(t => t.threshold != undefined && t[kind] != undefined && t[kind] !== null && t[kind] !== "");
+        if (tiers.length && price != undefined) {
+            let base = (typeof price == "number") ? price : MEJHelpers.toDefaultCurrency(price);
+            let match = tiers.filter(t => base >= t.threshold).sort((a, b) => b.threshold - a.threshold)[0];
+            if (match)
+                return match[kind];
+        }
+        return adjustment.default?.[kind] ?? fallback;
     }
 
     static canAfford(item, actor) {
@@ -889,8 +908,8 @@ export class ShopSheet extends EnhancedJournalSheet {
         let items = this.document.getFlag('monks-enhanced-journal', 'items') || {};
 
         for (let item of Object.values(items)) {
-            let sell = adjustment[item.type]?.sell ?? adjustment.default.sell ?? 1;
             let price = MEJHelpers.getPrice(foundry.utils.getProperty(item, "flags.monks-enhanced-journal.price"));
+            let sell = ShopSheet.adjustmentRate(adjustment, item, "sell", price);
             let converted = distributeCurrency(price.value * sell, price.currency, MonksEnhancedJournal.currencies);
             // never let a priced item become free after conversion; charge 1 of the lowest denomination instead
             if (price.value * sell > 0 && converted.value == 0)
