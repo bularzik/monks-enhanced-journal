@@ -174,6 +174,14 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
         }));
     }
 
+    // priceTiers live as a sibling of `adjustment` in the expanded form data (not nested
+    // under it); returns the sorted/filtered array ready to attach at `adjustment.priceTiers`
+    static _extractTiers(expandedData) {
+        return Object.values(expandedData.priceTiers || {})
+            .filter(t => t.threshold != undefined && t.threshold !== null && t.threshold !== "")
+            .sort((a, b) => a.threshold - b.threshold);
+    }
+
     static async onSubmitForm(event, form, formData) {
         let submitData = foundry.utils.expandObject(formData.object);
         for (let [k, v] of Object.entries(submitData.adjustment)) {
@@ -186,14 +194,19 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
                 delete submitData.adjustment[k];
         }
 
-        let tiers = Object.values(submitData.priceTiers || {})
-            .filter(t => t.threshold != undefined && t.threshold !== null && t.threshold !== "")
-            .sort((a, b) => a.threshold - b.threshold);
-        foundry.utils.setProperty(submitData.adjustment, "priceTiers", tiers);
+        foundry.utils.setProperty(submitData.adjustment, "priceTiers", AdjustPrice._extractTiers(submitData));
 
         if (this.options.document) {
             await this.options.document.unsetFlag('monks-enhanced-journal', 'adjustment');
             await this.options.document.setFlag('monks-enhanced-journal', 'adjustment', submitData.adjustment);
+            // Bridge to the flag namespace the live buy/sell call sites actually read
+            // (ShopSheet#sheetSettings() -> flags.monks-enhanced-journal.sheet-settings.adjustment).
+            // ShopSheet.js's one-time migration only copies flags.adjustment -> sheet-settings.adjustment
+            // the first time a shop is rendered and never resyncs after that, so without this the
+            // dialog's edits (including these price tiers) would silently never reach the live
+            // player-sell/buy-back flow for any shop that already went through that migration.
+            await this.options.document.unsetFlag('monks-enhanced-journal', 'sheet-settings.adjustment');
+            await this.options.document.setFlag('monks-enhanced-journal', 'sheet-settings.adjustment', submitData.adjustment);
         } else
             await game.settings.set("monks-enhanced-journal", "adjustment-defaults", submitData.adjustment, { diff: false });
     }
@@ -202,12 +215,7 @@ export class AdjustPrice extends HandlebarsApplicationMixin(ApplicationV2) {
         const fd = new foundry.applications.ux.FormDataExtended(this.element);
         let data = foundry.utils.expandObject(fd.object);
 
-        // priceTiers live as a sibling of `adjustment` in the form (not nested under it);
-        // fold the current (possibly unsaved) tiers in so the conversion honors them too
-        let tiers = Object.values(data.priceTiers || {})
-            .filter(t => t.threshold != undefined && t.threshold !== null && t.threshold !== "")
-            .sort((a, b) => a.threshold - b.threshold);
-        foundry.utils.setProperty(data.adjustment, "priceTiers", tiers);
+        foundry.utils.setProperty(data.adjustment, "priceTiers", AdjustPrice._extractTiers(data));
 
         this.options.journalsheet.convertItems(data);
 
