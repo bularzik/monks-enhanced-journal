@@ -200,6 +200,7 @@ export class MonksEnhancedJournal {
 	}
 
 	static altOpensOutside(event) {
+		if (!event) return false;
 		let alt = !!(event?.altKey);
 		return setting("invert-alt-open") ? !alt : alt;
 	}
