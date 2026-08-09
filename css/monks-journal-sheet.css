@@ -2705,7 +2705,7 @@ body.theme-light #make-offering {
     float: left;
     margin-right: 10px;
     margin-bottom: 10px;
-    background: #eee;
+    background: var(--mej-portrait-background);
 }
 .journal-menu header {
     flex: 0 0 30px;

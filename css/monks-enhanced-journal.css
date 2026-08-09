@@ -175,6 +175,7 @@
     --mej-sheet-button-background-hover: var(--mej-sheet-button-background);
     --mej-sheet-button-color: var(--mej-sheet-color);
     --mej-slideshow-loading-background: url("../assets/loading.gif") no-repeat center center cover;
+    --mej-portrait-background: #eee;
 }
 
 #enhanced-journal-sheet > menu.controls-dropdown {
@@ -1968,4 +1969,7 @@ body.theme-light #list-item-edit .items-list header {
     --mej-sheet-button-background: rgb(70, 69, 63);
     --mej-sheet-button-background-hover: var(--mej-sheet-button-background);
     --mej-sheet-button-color: var(--mej-sheet-color);
+
+    /* Portrait plate (behind transparent portrait images) */
+    --mej-portrait-background: rgb(55, 55, 52);
 }
