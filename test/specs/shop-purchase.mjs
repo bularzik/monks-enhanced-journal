@@ -45,7 +45,7 @@ await withSession('shop-purchase', { users: ['Gamemaster', 'User 1'] }, async (s
   // "Confirm Quantity" DialogV2 (same as LootSheet's drop path in
   // loot-drop.mjs) - click through it for real.
   await gm.waitForSelector('dialog.dialog button[data-action="yes"]', { timeout: 15_000 });
-  await gm.click('dialog.dialog button[data-action="yes"]', { timeout: 30_000 });
+  await gm.click('dialog.dialog button[data-action="yes"]');
   await gm.waitForFunction((id) => {
     const items = game.journal.get(id)?.pages.contents[0]?.getFlag('monks-enhanced-journal', 'items');
     return items && Object.keys(items).length > 0;
@@ -67,13 +67,17 @@ await withSession('shop-purchase', { users: ['Gamemaster', 'User 1'] }, async (s
   await p1.waitForFunction(() => game.users.getName('Gamemaster')?.active === true, null, { timeout: 15_000 });
   await openEntry(p1, shopId);
   // "items" is a subtab, not the sheet's default ("description") - switch to
-  // it so the request-item control is actually visible/clickable.
-  await p1.click('.monks-enhanced-journal [data-tab="items"]', { timeout: 30_000 });
-  await p1.click('.monks-enhanced-journal [data-action="requestItem"]', { timeout: 30_000 });
+  // it so the request-item control is actually visible/clickable. Wait for
+  // each control explicitly first (both depend on async render/socket state)
+  // so the click itself never has to carry an inflated timeout.
+  await p1.waitForSelector('.monks-enhanced-journal [data-tab="items"]', { timeout: 15_000 });
+  await p1.click('.monks-enhanced-journal [data-tab="items"]');
+  await p1.waitForSelector('.monks-enhanced-journal [data-action="requestItem"]', { timeout: 15_000 });
+  await p1.click('.monks-enhanced-journal [data-action="requestItem"]');
   // Quantity confirmation dialog (EnhancedJournalSheet.confirmQuantity, a
   // DialogV2.confirm) -> accept with the default quantity of 1.
   await p1.waitForSelector('dialog.dialog button[data-action="yes"]', { timeout: 15_000 });
-  await p1.click('dialog.dialog button[data-action="yes"]', { timeout: 30_000 });
+  await p1.click('dialog.dialog button[data-action="yes"]');
 
   // GM approves the purchase request from chat. ShopSheet.onRequestItem's
   // 'confirm' path (ShopSheet.js:569-579) calls
@@ -97,7 +101,7 @@ await withSession('shop-purchase', { users: ['Gamemaster', 'User 1'] }, async (s
   });
   const approveSel = '.chat-message .request-accept';
   await gm.waitForSelector(approveSel, { timeout: 15_000 });
-  await gm.locator(approveSel).last().click({ timeout: 30_000 });
+  await gm.locator(approveSel).last().click({ timeout: 15_000 });
 
   // Item lands on the shopper; 5 gp deducted.
   await gm.waitForFunction((actorId) =>
