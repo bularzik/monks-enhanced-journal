@@ -86,6 +86,7 @@ export class CustomisePages extends HandlebarsApplicationMixin(ApplicationV2) {
                 } else if (key == "adjustment") {
                     let defaultAdjustment = setting("adjustment-defaults");
                     contextValue = foundry.utils.mergeObject(foundry.utils.duplicate(defaultAdjustment), contextValue);
+                    delete contextValue.priceTiers;
 
                     contextValue = MonksEnhancedJournal.convertObjectToArray(contextValue).sort((a, b) => {
                         if (a.id === "default") return -1;
