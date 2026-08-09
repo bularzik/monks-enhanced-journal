@@ -35,6 +35,9 @@ promote it to `specs/`.
 - Test entities are named `TT-...` and are auto-swept; never touch hand-made
   entries (`Baseline Test`, `T-*`, ...).
 - Headless only; timeouts ≤15s; single browser per spec (8GB RAM).
+- Clients join with `core.noCanvas` forced on (see `helpers/foundry.js`
+  `join()`) — the scene canvas never initializes, since these specs only
+  exercise journal sheets (DOM), which are canvas-independent.
 - On failure you get the assertion, screenshots in `screenshots/`, and the
   buffered browser console.
 - **Shared-server displacement**: Foundry only allows one connection per user;

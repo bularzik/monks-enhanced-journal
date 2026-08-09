@@ -89,6 +89,28 @@ async function ensureWorld(browser, worldId) {
 // disabled flag.
 async function join(browser, session, userName) {
   const context = await browser.newContext({ viewport: VIEWPORT });
+  // Boot this client in "no canvas" mode: MEJ tests only exercise journal
+  // sheets (plain DOM), never the scene canvas, but Foundry still
+  // software-rasterizes the full PIXI/WebGL canvas per logged-in headless
+  // context by default — that's what shows up in failure screenshots as
+  // "hardware acceleration disabled", 527ms latency, and 2 FPS, and it's
+  // what pushes an 8GB test box into swap. core.noCanvas skips canvas
+  // initialization entirely (client/canvas/board.mjs: Canvas#initialize()
+  // returns immediately when `game.settings.get("core","noCanvas")` is
+  // true, before touching WebGL or PIXI).
+  //
+  // Client-scope settings live in localStorage under "<namespace>.<key>",
+  // JSON-encoded — client/helpers/client-settings.mjs
+  // ClientSettings#storage (client scope -> window.localStorage) and
+  // #cleanJSON()/#setClient() (`storage.setItem(doc.key, JSON.stringify(value))`).
+  // For the boolean core.noCanvas that stringifies to the 4-char literal
+  // "true" (parsed back through a JSONField on read: common/documents/setting.mjs
+  // `value: new fields.JSONField(...)`). Seed it with addInitScript so it's
+  // in place before game.mjs registers the setting and boots /game, on
+  // every navigation this context makes (not just the first).
+  await context.addInitScript(() => {
+    window.localStorage.setItem('core.noCanvas', 'true');
+  });
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
   const log = [];
@@ -108,6 +130,19 @@ async function join(browser, session, userName) {
   if (!found) throw new Error(`No user option labeled "${userName}" on join screen`);
   await page.click('button[name="join"]');
   await page.waitForFunction(() => window.game?.ready === true, null, { timeout: 30_000 });
+  // Guard against a storage-format mistake silently reverting the
+  // optimization and running the full canvas anyway.
+  const noCanvas = await page.evaluate(() => ({
+    setting: game.settings.get('core', 'noCanvas'),
+    canvasReady: game.canvas?.ready ?? null,
+  }));
+  if (noCanvas.setting !== true || noCanvas.canvasReady) {
+    throw new Error(
+      `core.noCanvas did not take effect for "${userName}" ` +
+      `(setting=${noCanvas.setting}, canvas.ready=${noCanvas.canvasReady}) — ` +
+      `check the localStorage key/value format in join()`
+    );
+  }
   return page;
 }
 
