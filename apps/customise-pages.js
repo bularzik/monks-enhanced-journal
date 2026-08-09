@@ -186,10 +186,11 @@ export class CustomisePages extends HandlebarsApplicationMixin(ApplicationV2) {
 
     changeData(event) {
         let prop = $(event.currentTarget).attr("name");
-        if (foundry.utils.hasProperty(this, prop)) {
-            let val = $(event.currentTarget).attr("type") == "checkbox" ? $(event.currentTarget).prop('checked') : $(event.currentTarget).val();
-            foundry.utils.setProperty(this, prop, val);
-        }
+        // Don't gate on hasProperty: optional keys (e.g. playerHidden) may not
+        // exist yet on the settings object the first time they're set, and
+        // setProperty will happily create the path.
+        let val = $(event.currentTarget).attr("type") == "checkbox" ? $(event.currentTarget).prop('checked') : $(event.currentTarget).val();
+        foundry.utils.setProperty(this, prop, val);
     }
 
     _onDragStart(event) {
