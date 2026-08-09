@@ -44,7 +44,36 @@
         </ol>
         {{/if}}
     </div>
-    
+
+    <div class="items-list">
+        <header>
+            <div>{{localize 'MonksEnhancedJournal.PriceTiers'}}</div>
+            <div style="text-align: right;">Sell</div>
+            <div style="text-align: right;">Buy Back</div>
+            <div style="flex: 0 0 30px;"><button type="button" class="inline-control icon fas fa-plus-square" data-action="addTier"></button></div>
+        </header>
+        <ol class="item-list">
+            {{#each priceTiers as |tier|}}
+            <li data-tier-idx="{{@index}}">
+                <div class="form-fields flexrow">
+                    <span style="flex: 0 0 20px;">&ge;</span>
+                    <input type="number" style="flex: 0 0 70px;text-align:right;" name="priceTiers.{{@index}}.threshold" min="0" step="any" data-dtype="Number" value="{{tier.threshold}}" />
+                </div>
+                <div class="form-fields flexrow" style="justify-content: flex-end;">
+                    <span style="font-size:20px;margin-left:10px;flex: 0 0 20px;text-align:left;">&times;</span>
+                    <input type="number" style="flex: 0 0 60px;text-align:right;" name="priceTiers.{{@index}}.sell" step="any" data-dtype="Number" value="{{tier.sell}}" />
+                </div>
+                <div class="form-fields flexrow" style="justify-content: flex-end;">
+                    <span style="font-size:20px;margin-left:10px;flex: 0 0 20px;text-align:left;">&times;</span>
+                    <input type="number" style="flex: 0 0 60px;text-align:right;" name="priceTiers.{{@index}}.buy" min="-1" step="any" data-dtype="Number" value="{{tier.buy}}" />
+                </div>
+                <div style="flex: 0 0 30px;"><button type="button" class="inline-control icon fas fa-trash" data-action="removeTier"></button></div>
+            </li>
+            {{/each}}
+        </ol>
+        <p class="notes" style="margin: 0px;">{{localize 'MonksEnhancedJournal.PriceTiersHint'}}</p>
+    </div>
+
     {{#if showConvert}}
     <hr style="margin: 0px;" />
     <div class="form-group">

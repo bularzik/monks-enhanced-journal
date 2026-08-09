@@ -351,6 +351,8 @@
   "MonksEnhancedJournal.CannotFindItem": "Cannot find that item.",
   "MonksEnhancedJournal.ItemIsLocked": "That item is locked from purchasing",
   "MonksEnhancedJournal.AdjustPrices": "Adjust Prices",
+  "MonksEnhancedJournal.PriceTiers": "Price Tiers",
+  "MonksEnhancedJournal.PriceTiersHint": "Items priced at or above a tier's threshold (in the default currency) use that tier's rates unless the item's type has an explicit rate. The highest matching threshold wins.",
   "MonksEnhancedJournal.ImportItems": "Import Items",
   "MonksEnhancedJournal.ImportAllActorItems": "Import all actor items",
   "MonksEnhancedJournal.Canvas": "Canvas",
