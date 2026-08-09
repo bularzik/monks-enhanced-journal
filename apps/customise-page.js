@@ -122,6 +122,7 @@ export class CustomisePage extends HandlebarsApplicationMixin(ApplicationV2) {
             let adjustments = {
                 default: {}, ...foundry.utils.duplicate(this.document.getFlag('monks-enhanced-journal', 'adjustment') || {})
             };
+            delete adjustments.priceTiers;
 
             for (let t of Object.keys(types)) {
                 let adj = adjustments[t] || { sell: null, buy: null };

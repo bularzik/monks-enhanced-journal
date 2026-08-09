@@ -197,6 +197,28 @@ export class MEJHelpers {
         return result;
     }
 
+    // Resolves the buy/sell rate for a shop adjustment: explicit item-type override,
+    // then highest matching price tier (threshold in default-currency units), then the
+    // default rate. Lives here (rather than on ShopSheet) so both ShopSheet and
+    // EnhancedJournalSheet can call it without creating an import cycle
+    // (ShopSheet already imports EnhancedJournalSheet).
+    static adjustmentRate(adjustment, item, kind, price) {
+        // kind: "buy" = shop buying back from a player (fallback 0.5),
+        //       "sell" = shop selling to a player (fallback 1)
+        let fallback = kind == "buy" ? 0.5 : 1;
+        let typeRate = adjustment[item.type]?.[kind];
+        if (typeRate != undefined)
+            return typeRate;
+        let tiers = (adjustment.priceTiers || []).filter(t => t.threshold != undefined && t[kind] != undefined && t[kind] !== null && t[kind] !== "");
+        if (tiers.length && price != undefined) {
+            let base = (typeof price == "number") ? price : MEJHelpers.toDefaultCurrency(price);
+            let match = tiers.filter(t => base >= t.threshold).sort((a, b) => b.threshold - a.threshold)[0];
+            if (match)
+                return match[kind];
+        }
+        return adjustment.default?.[kind] ?? fallback;
+    }
+
     // Shared guard for the fake-event `sheet._onDropItem(event, itemData)` calls used
     // throughout the module to add an item straight to an actor's sheet. Some systems'
     // ActorSheet._onDropItem implementations don't tolerate this synthetic event shape,

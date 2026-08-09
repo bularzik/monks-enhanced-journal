@@ -2473,7 +2473,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                                             let sysPrice = MEJHelpers.getSystemPrice(itemData, pricename());
                                             let price = MEJHelpers.getPrice(sysPrice);
                                             let adjustment = this.sheetSettings()?.adjustment || {};
-                                            let sell = adjustment[itemData.type]?.sell ?? adjustment?.default?.sell ?? 1;
+                                            let sell = MEJHelpers.adjustmentRate(adjustment, itemData, "sell", price);
                                             let cost = MEJHelpers.getPrice(`${price.value * sell} ${price.currency}`);
                                             let itemQuantity = (quantity != "" ? await getDiceRoll(quantity) : 1);
                                             itemData.flags['monks-enhanced-journal'] = {
@@ -2630,7 +2630,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                         let sell = 1;
                         if (this.document.type == "shop") {
                             let adjustment = this.sheetSettings()?.adjustment || {};
-                            sell = adjustment[item.type]?.sell ?? adjustment.default.sell ?? 1;
+                            sell = MEJHelpers.adjustmentRate(adjustment, item, "sell", price);
                         }
                         let flags = Object.assign({
                             hide: false,
