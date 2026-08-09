@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "description": "Playwright harness for testing MEJ against live local Foundry v14. See README.md.",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "playwright": "^1.49.0"
   }

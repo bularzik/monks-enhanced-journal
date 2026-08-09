@@ -10,9 +10,12 @@ await withSession('shop-purchase', { users: ['Gamemaster', 'User 1'] }, async (s
   // Leftover request-item chat cards from earlier (interrupted) runs of this
   // spec share the `.request-accept` selector with the one we're about to
   // create, and sweep() (journal/actor/item docs only) never clears them -
-  // wipe them first so the later selector is unambiguous.
+  // wipe them first so the later selector is unambiguous. Scope to TT- items
+  // only so a genuine hand-made purchase-request card in world-a survives.
   await gm.evaluate(async () => {
-    const stale = game.messages.filter((m) => m.getFlag('monks-enhanced-journal', 'action') === 'buy');
+    const stale = game.messages.filter((m) =>
+      m.getFlag('monks-enhanced-journal', 'action') === 'buy' &&
+      String(m.getFlag('monks-enhanced-journal', 'items')?.[0]?.name ?? '').startsWith('TT-'));
     for (const m of stale) await m.delete();
   });
 

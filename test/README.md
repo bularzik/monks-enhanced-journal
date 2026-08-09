@@ -37,6 +37,15 @@ promote it to `specs/`.
 - Headless only; timeouts ≤15s; single browser per spec (8GB RAM).
 - On failure you get the assertion, screenshots in `screenshots/`, and the
   buffered browser console.
+- **Shared-server displacement**: Foundry only allows one connection per user;
+  logging in as Gamemaster/User 1/User 2 displaces any existing connection for
+  that same user, and symmetrically another session logging in as one of
+  those users mid-spec displaces the harness (symptom: `game is not defined`
+  errors mid-spec, or the page finds itself back at `/join`). Before running,
+  check `curl -s localhost:30000/api/status` — a nonzero `users` count means
+  other sessions are connected and mutual displacement is possible. Fixture
+  names are also fixed (`TT-shop`, `TT-quest-objectives`, ...), so never run
+  two harness instances concurrently — they'd sweep each other's fixtures.
 
 ## Release zips
 

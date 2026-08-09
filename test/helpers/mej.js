@@ -15,7 +15,10 @@ export async function withSession(name, opts, fn) {
       await snap(page, `${name}-${user.replaceAll(' ', '')}-fail`).catch(() => {});
     }
     const buffered = [...session.logs.values()].flat();
-    if (buffered.length) e.message += `\n--- browser console ---\n${buffered.join('\n')}`;
+    if (buffered.length) {
+      if (!(e instanceof Error)) e = new Error(String(e), { cause: e });
+      e.message += `\n--- browser console ---\n${buffered.join('\n')}`;
+    }
     throw e;
   } finally {
     try { if (gm) await sweep(gm); } catch {}
