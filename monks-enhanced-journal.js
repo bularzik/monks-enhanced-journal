@@ -199,6 +199,11 @@ export class MonksEnhancedJournal {
 		return false;
 	}
 
+	static altOpensOutside(event) {
+		let alt = !!(event?.altKey);
+		return setting("invert-alt-open") ? !alt : alt;
+	}
+
 	static convertObjectToArray(obj) {
 		let arr = [];
 		for (let [k, v] of Object.entries(obj)) {
@@ -363,7 +368,7 @@ export class MonksEnhancedJournal {
 
 			let hasBlank = ["blank", "folder"].includes(MonksEnhancedJournal?.journal?.document?.type);
 			let useOriginal = this._groupSelect || !!game.MonksActiveTiles?.waitingInput;
-			let dontUseMEJ = event.altKey || useOriginal;
+			let dontUseMEJ = MonksEnhancedJournal.altOpensOutside(event) || useOriginal;
 			if (!dontUseMEJ)
 				dontUseMEJ = !await MonksEnhancedJournal.openJournalEntry(entry, { newtab: setting('open-new-tab') && !hasBlank });
 			if (dontUseMEJ) {
@@ -676,7 +681,7 @@ export class MonksEnhancedJournal {
 
 			// Action 3 - Render the Entity sheet
 			if (doc.documentName == 'Actor' || doc.documentName == 'JournalEntry' || doc.documentName == 'JournalEntryPage') {
-				if (event.altKey || setting('open-outside') || ["SFDialog", "forge-compendium-browser"].includes(app?.id) || !MonksEnhancedJournal.openJournalEntry(doc, { newtab: event.ctrlKey && !setting("open-new-tab"), anchor: a.dataset.anchor })) {
+				if (MonksEnhancedJournal.altOpensOutside(event) || setting('open-outside') || ["SFDialog", "forge-compendium-browser"].includes(app?.id) || !MonksEnhancedJournal.openJournalEntry(doc, { newtab: event.ctrlKey && !setting("open-new-tab"), anchor: a.dataset.anchor })) {
 					if (doc.documentName == 'JournalEntry') {
 						if (doc.pages.size == 1) {
 							let page = doc.pages.contents[0];
@@ -705,7 +710,7 @@ export class MonksEnhancedJournal {
 		}
 		*/
 		Actor.prototype._onClickDocumentLink = async function (event) {
-			if (event.altKey || setting('open-outside') || ! await MonksEnhancedJournal.openJournalEntry(this, { newtab: (event.ctrlKey || event.metaKey) && !setting("open-new-tab") })) {
+			if (MonksEnhancedJournal.altOpensOutside(event) || setting('open-outside') || ! await MonksEnhancedJournal.openJournalEntry(this, { newtab: (event.ctrlKey || event.metaKey) && !setting("open-new-tab") })) {
 				return this.sheet.render(true);
 			}
 		}
@@ -723,7 +728,7 @@ export class MonksEnhancedJournal {
 			const target = event.target.closest("a[data-link]");
 
 			//|| ["SFDialog", "forge-compendium-browser"].includes(app?.id)
-			if (event.altKey || setting('open-outside') || ! await MonksEnhancedJournal.openJournalEntry(this, { newtab: (event.ctrlKey || event.metaKey) && !setting("open-new-tab"), anchor: target.dataset.hash })) {
+			if (MonksEnhancedJournal.altOpensOutside(event) || setting('open-outside') || ! await MonksEnhancedJournal.openJournalEntry(this, { newtab: (event.ctrlKey || event.metaKey) && !setting("open-new-tab"), anchor: target.dataset.hash })) {
 				if (this.pages.size == 1) {
 					let page = this.pages.contents[0];
 					let type = foundry.utils.getProperty(page, "flags.monks-enhanced-journal.type");
@@ -741,7 +746,7 @@ export class MonksEnhancedJournal {
 		JournalEntryPage.prototype._onClickDocumentLink = async function (event) {
 			const target = event.target.closest("a[data-link]");
 
-			if (event.altKey || setting('open-outside') || ! await MonksEnhancedJournal.openJournalEntry(this.parent, { newtab: (event.ctrlKey || event.metaKey) && !setting("open-new-tab"), pageId: this.id, anchor: target.dataset.hash })) {
+			if (MonksEnhancedJournal.altOpensOutside(event) || setting('open-outside') || ! await MonksEnhancedJournal.openJournalEntry(this.parent, { newtab: (event.ctrlKey || event.metaKey) && !setting("open-new-tab"), pageId: this.id, anchor: target.dataset.hash })) {
 				let type = foundry.utils.getProperty(this, "flags.monks-enhanced-journal.type");
 				if (type == "base" || type == "oldentry") type = "journalentry";
 
@@ -793,6 +798,9 @@ export class MonksEnhancedJournal {
 			let li = target.closest("[data-entry-id]");
 			const document = await this.collection.getDocument(li.dataset.entryId);
 			if (document instanceof JournalEntry) {
+				if (MonksEnhancedJournal.altOpensOutside(event))
+					return wrapped(...args);
+
 				if (! await MonksEnhancedJournal.openJournalEntry(document, { editable: game.user.isGM && !this.collection.locked })) {
 					if (document.pages.size == 1) {
 						let page = document.pages.contents[0];
@@ -1154,7 +1162,7 @@ export class MonksEnhancedJournal {
 
 			let entity = this.page || this.entry;
 			if (allowed && this.entry) {
-				if (wrapped.altKey || ! await MonksEnhancedJournal.openJournalEntry(this.entry, options)) {
+				if (MonksEnhancedJournal.altOpensOutside(wrapped) || ! await MonksEnhancedJournal.openJournalEntry(this.entry, options)) {
 					let page = this.page;
 					if (this.entry.pages.size == 1) {
 						page = this.entry.pages.contents[0];
@@ -2337,6 +2345,9 @@ export class MonksEnhancedJournal {
 				return false;
 
 			MonksEnhancedJournal.fixType(doc);
+
+			if (setting("mej-only-types") && (doc instanceof JournalEntry || doc instanceof JournalEntryPage) && !MonksEnhancedJournal.getMEJType(doc))
+				return false;
 
 			let sheet = (!doc?._sheet ? doc?._getSheetClass() : doc?._sheet);
 			if ((sheet?.name || sheet?.constructor?.name) == 'QuestPreviewShim')
