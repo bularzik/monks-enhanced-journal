@@ -85,6 +85,17 @@ export async function snap(page, label) {
 }
 
 export async function dropOnSheet(page, selector, data) {
+  // On the no-canvas fast render path, the outer sheet window can be
+  // visible (see openEntry's wait) before an inner subsheet element (e.g.
+  // ".loot-items .items-list") exists — the slow canvas render used to
+  // mask this race. Wait for the actual drop target to exist in the DOM
+  // (state: 'attached', not the default 'visible') so callers get this for
+  // free: some sheets (e.g. person.html's relationship tabs) render every
+  // tab up front and only toggle an "active" class, so the drop target is
+  // legitimately hidden when its tab isn't active, and a synthetic
+  // dispatchEvent below doesn't require visibility the way a real user
+  // interaction would.
+  await page.waitForSelector(selector, { state: 'attached', timeout: 15_000 });
   await page.evaluate(({ selector, data }) => {
     const el = document.querySelector(selector);
     if (!el) throw new Error(`dropOnSheet: no element matches ${selector}`);
