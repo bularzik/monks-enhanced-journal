@@ -202,7 +202,7 @@ export class CustomisePage extends HandlebarsApplicationMixin(ApplicationV2) {
         for (let [k, v] of Object.entries(settings)) {
             for (let [k2, v2] of Object.entries(v)) {
                 for (let [k3, v3] of Object.entries(v2)) {
-                    if (defaultSettings[k][k2][k3] != v3) {
+                    if ((defaultSettings[k]?.[k2]?.[k3] ?? false) != v3) {
                         changed[k] = changed[k] || {};
                         changed[k][k2] = v2;
                     }
