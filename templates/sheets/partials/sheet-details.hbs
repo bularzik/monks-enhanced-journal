@@ -4,7 +4,7 @@
             {{#each detailFields as |field|}}
             {{#unless field.full}}
             <li {{#if field.hidden}} style="display:none;" {{/if}}>
-                <label>{{localize field.name}}</label>
+                <label>{{localize field.name}}{{#if field.playerHidden}} <i class="fas fa-eye-slash" data-tooltip="{{localize 'MonksEnhancedJournal.HiddenFromPlayers'}}"></i>{{/if}}</label>
                 <input type="text" name="flags.monks-enhanced-journal.attributes.{{field.id}}" value="{{ field.value }}" />
             </li>
             {{/unless}}
@@ -16,7 +16,7 @@
     {{#each detailFields as |field|}}
     {{#if field.full}}
     <div class="form-group" {{#if field.hidden}} style="display:none;" {{/if}}>
-        <label>{{localize field.name}}</label>
+        <label>{{localize field.name}}{{#if field.playerHidden}} <i class="fas fa-eye-slash" data-tooltip="{{localize 'MonksEnhancedJournal.HiddenFromPlayers'}}"></i>{{/if}}</label>
         <textarea name="flags.monks-enhanced-journal.attributes.{{field.id}}">{{field.value}}</textarea>
     </div>
     {{/if}}
