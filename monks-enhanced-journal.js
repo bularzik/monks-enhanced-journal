@@ -3435,8 +3435,16 @@ export class MonksEnhancedJournal {
 
 				sheet.addItem({ data: data.itemdata });
 
-				let actor = await fromUuid(data.actorId);
-				cls.addLog.call(entry, { actor: actor.name, item: data.itemdata.name, quantity: data.quantity, price: data.price, type: 'sell' });
+				// Not every sellItem caller sends an actorId: ShopSheet's "free"
+				// selling mode (ShopSheet.js _onDropItem) already logs the sale
+				// itself (with the actor already resolved) via a separate addLog
+				// emit, so it only sends { shopid, itemdata } here. Only the
+				// offer/accept flow (acceptItem, monks-enhanced-journal.js) relies
+				// on this handler to log - skip logging when there's no actor to
+				// attribute it to, instead of throwing on actor.name.
+				let actor = data.actorId ? await fromUuid(data.actorId) : null;
+				if (actor)
+					cls.addLog.call(entry, { actor: actor.name, item: data.itemdata.name, quantity: data.quantity, price: data.price, type: 'sell' });
 			}
 		}
 	}
