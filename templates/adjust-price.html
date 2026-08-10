@@ -57,15 +57,15 @@
             <li data-tier-idx="{{@index}}">
                 <div class="form-fields flexrow">
                     <span style="flex: 0 0 20px;">&ge;</span>
-                    <input type="number" style="flex: 0 0 70px;text-align:right;" name="priceTiers.{{@index}}.threshold" min="0" step="any" data-dtype="Number" value="{{tier.threshold}}" />
+                    <input type="number" class="sell-field" style="flex: 0 0 70px;text-align:right;" name="priceTiers.{{@index}}.threshold" min="0" step="any" data-dtype="Number" value="{{tier.threshold}}" />
                 </div>
                 <div class="form-fields flexrow" style="justify-content: flex-end;">
                     <span style="font-size:20px;margin-left:10px;flex: 0 0 20px;text-align:left;">&times;</span>
-                    <input type="number" style="flex: 0 0 60px;text-align:right;" name="priceTiers.{{@index}}.sell" step="any" data-dtype="Number" value="{{tier.sell}}" />
+                    <input type="number" class="sell-field" style="flex: 0 0 60px;text-align:right;" name="priceTiers.{{@index}}.sell" step="any" data-dtype="Number" value="{{tier.sell}}" />
                 </div>
                 <div class="form-fields flexrow" style="justify-content: flex-end;">
                     <span style="font-size:20px;margin-left:10px;flex: 0 0 20px;text-align:left;">&times;</span>
-                    <input type="number" style="flex: 0 0 60px;text-align:right;" name="priceTiers.{{@index}}.buy" min="-1" step="any" data-dtype="Number" value="{{tier.buy}}" />
+                    <input type="number" class="buy-field" style="flex: 0 0 60px;text-align:right;" name="priceTiers.{{@index}}.buy" min="-1" step="any" data-dtype="Number" value="{{tier.buy}}" />
                 </div>
                 <div style="flex: 0 0 30px;"><button type="button" class="inline-control icon fas fa-trash" data-action="removeTier"></button></div>
             </li>
