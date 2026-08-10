@@ -59,39 +59,41 @@ export class PersonSheet extends EnhancedJournalSheet {
     async _prepareBodyContext(context, options) {
         context = await super._prepareBodyContext(context, options);
 
-        if (foundry.utils.hasProperty(context, "data.flags.monks-enhanced-journal.attributes")) {
-            // check to make sure the attributes are formatted correctly
-            let changedObjectValues = false;
-            let sheetSettings = {};
-            let attributes = context?.data?.flags['monks-enhanced-journal']?.attributes || {};
-            for (let [k, v] of Object.entries(attributes)) {
-                if (typeof v == "object") {
-                    sheetSettings[k] = { shown: !v.hidden };
-                    attributes[k] = v.value;
-                    changedObjectValues = true;
+        if (game.user.isGM) {
+            if (foundry.utils.hasProperty(context, "data.flags.monks-enhanced-journal.attributes")) {
+                // check to make sure the attributes are formatted correctly
+                let changedObjectValues = false;
+                let sheetSettings = {};
+                let attributes = context?.data?.flags['monks-enhanced-journal']?.attributes || {};
+                for (let [k, v] of Object.entries(attributes)) {
+                    if (typeof v == "object") {
+                        sheetSettings[k] = { shown: !v.hidden };
+                        attributes[k] = v.value;
+                        changedObjectValues = true;
+                    }
                 }
-            }
-            if (changedObjectValues) {
-                await this.document.update({ 'monks-enhanced-journal.flags.sheet-settings.attributes': sheetSettings });
-                await this.document.setFlag('monks-enhanced-journal', 'attributes', attributes);
-            }
-        } else if (foundry.utils.hasProperty(context, "data.flags.monks-enhanced-journal.fields")) {
-            // convert fields to attributes
-            let fields = foundry.utils.getProperty(context, "data.flags.monks-enhanced-journal.fields");
-            let attributes = {};
-            let sheetSettings = {};
-            let flags = foundry.utils.getProperty(context, "data.flags.monks-enhanced-journal") || {};
-            let defaultSettings = this.sheetSettings() || {};
+                if (changedObjectValues) {
+                    await this.document.update({ 'flags.monks-enhanced-journal.sheet-settings.attributes': sheetSettings });
+                    await this.document.setFlag('monks-enhanced-journal', 'attributes', attributes);
+                }
+            } else if (foundry.utils.hasProperty(context, "data.flags.monks-enhanced-journal.fields")) {
+                // convert fields to attributes
+                let fields = foundry.utils.getProperty(context, "data.flags.monks-enhanced-journal.fields");
+                let attributes = {};
+                let sheetSettings = {};
+                let flags = foundry.utils.getProperty(context, "data.flags.monks-enhanced-journal") || {};
+                let defaultSettings = this.sheetSettings() || {};
 
-            for (let attr of Object.keys(defaultSettings.attributes)) {
-                attributes[attr] = flags[attr] || "";
-                if (fields[attr] != undefined)
-                    sheetSettings[attr] = { shown: !!fields[attr]?.value };
+                for (let attr of Object.keys(defaultSettings.attributes)) {
+                    attributes[attr] = flags[attr] || "";
+                    if (fields[attr] != undefined)
+                        sheetSettings[attr] = { shown: !!fields[attr]?.value };
+                }
+                foundry.utils.setProperty(context, "data.flags.monks-enhanced-journal.attributes", attributes);
+                foundry.utils.setProperty(context, "data.flags.monks-enhanced-journal.sheet-settings.attributes", sheetSettings);
+                await this.document.setFlag('monks-enhanced-journal', 'attributes', attributes);
+                await this.document.update({ 'flags.monks-enhanced-journal.sheet-settings.attributes': sheetSettings });
             }
-            foundry.utils.setProperty(context, "data.flags.monks-enhanced-journal.attributes", attributes);
-            foundry.utils.setProperty(context, "data.flags.monks-enhanced-journal.sheet-settings.attributes", sheetSettings);
-            await this.document.setFlag('monks-enhanced-journal', 'attributes', attributes);
-            await this.document.update({ 'monks-enhanced-journal.flags.sheet-settings.attributes': sheetSettings });
         }
 
         context.relationships = await this.getRelationships();
