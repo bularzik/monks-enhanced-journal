@@ -52,6 +52,33 @@ promote it to `specs/`.
 
 ## Release zips
 
+**Before uploading any release, run**
+
+    node release-smoke.mjs <manifest-url-or-local-module.json>
+
+e.g. `node release-smoke.mjs https://github.com/<owner>/monks-enhanced-journal/releases/download/<tag>/module.json`,
+or against a freshly built artifact: `node release-smoke.mjs /tmp/mej-release/<tag>/module.json`
+(it uses the `module.zip` beside a local manifest, otherwise the manifest's own
+`download` URL). Exit 0 = safe to upload; exit 1 = do not upload; exit 2 = usage
+or pre-flight refusal.
+
+It installs the artifact the way a user does — manifest → download → unzip into
+`Data/Data/modules/` — in a throwaway `tt-release-smoke` world with only
+`monks-enhanced-journal` + `lib-wrapper` enabled, and asserts the sidebar
+*Create Journal Entry* → *Shop* path really opens MEJ's own sheet (twice in one
+session, to catch a libWrapper wrapper that stops chaining), that the persisted
+page type stays openable across a reload, that bug-era `text`+flags pages still
+open, and that a plain Text entry still gets the core sheet. It is the
+regression test for the 14.04 "shop opens the plain journal note" defect.
+
+It is **not** a spec and `run.mjs` never picks it up (that only scans `specs/`):
+it hits the network, stops and starts the Foundry server, swaps the live module
+directory aside and creates/deletes a world. It refuses to start unless
+`/api/status` reports `users: 0`, and it restores everything — module directory
+back, world deleted, Foundry restarted on `world-a` — from a `finally`, even
+when an assertion throws mid-world. All machine-specific paths are in the
+`CONFIG` block at the top of the file.
+
 `test/` must never ship. The canonical release zip command (run at repo root):
 
     zip -r module.zip . -x 'test/*' '.git/*' '.claude/*' 'docs/*' 'node_modules/*' '.superpowers/*' '*.png' '.DS_Store' 'packs/.DS_Store' '.remember/*' '.github/*'
