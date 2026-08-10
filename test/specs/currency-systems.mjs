@@ -34,7 +34,13 @@
 // real currency credit already happened (actorPurchase runs synchronously on the
 // player's own client, before the emit), so it doesn't affect what's being validated
 // here - it's tolerated as a known console error rather than fixed (zero new product
-// code per the ruling on this task).
+// code per the ruling on this task). helpers/foundry.js's `join()` only records
+// `pageerror.message` (no stack/source: `log.push(\`[pageerror] ${e.message}\`)`), and
+// that message is the generic runtime string "Cannot read properties of null (reading
+// 'name')" - indistinguishable by text alone from any other null-property TypeError
+// anywhere on the page, so this one is scoped by WHEN it's tolerated (only on the GM's
+// client, only in the window around the sell-drop step below), not just by pattern -
+// see assertNoUnexpectedErrors's `sellWindow` argument below.
 //
 // A third and fourth error are Symbaroum's own system code, not MEJ's: its
 // SymbaroumActor.applyActiveEffects/prepareData pipeline has a reentrancy bug that
@@ -53,22 +59,38 @@ import { withSession, createEntry, openEntry, dropOnSheet } from '../helpers/mej
 
 const MODULE = 'monks-enhanced-journal';
 
-// EnhancedJournalSheet.js:1162's bug tolerates the empty getCurrency({}) path silently,
-// but the sellItem socket handler bug above genuinely throws - filter that one specific,
-// documented error out instead of using the shared assertNoErrors (which throws on any
-// console error) so a real regression elsewhere still fails the spec loudly.
-const KNOWN_ERRORS = [
-  /Cannot read properties of null \(reading 'name'\)/, // ShopSheet sellItem emit missing actorId, see header comment
+// Errors tolerated everywhere, on any page, for the whole session - each pattern is
+// specific enough on its own (see header comment) that a genuine unrelated regression
+// couldn't plausibly match it by accident.
+const GENERAL_KNOWN_ERRORS = [
   /Detected \d+ package/, // benign Foundry core package-scan log line observed during multi-reload sessions; not MEJ-related
   /ActiveEffect application phase .* has already completed/, // Symbaroum system bug, not MEJ - see header comment
   /Failed data preparation for .*Cannot set properties of undefined \(setting 'initial'\)/, // Symbaroum system bug, not MEJ - see header comment
   /Issues with SymbaroumTour.*permission to browse the host file system/, // Symbaroum's own startup tour probing for optional file-system assets this dev box doesn't grant browse access to - not MEJ
 ];
-function assertNoUnexpectedErrors(session, label) {
-  const errs = [...session.logs.values()].flat();
-  const unexpected = errs.filter((e) => !KNOWN_ERRORS.some((p) => p.test(e)));
-  const known = errs.filter((e) => KNOWN_ERRORS.some((p) => p.test(e)));
-  for (const e of known) console.log(`[${label}] tolerated known console error: ${e}`);
+// EnhancedJournalSheet.js:1162's bug tolerates the empty getCurrency({}) path silently,
+// but the sellItem socket handler bug (header comment #2) genuinely throws a *generic*
+// message ("Cannot read properties of null (reading 'name')") with no distinguishing
+// stack/source available to filter on - too broad to allow session-wide (any unrelated
+// null-property TypeError anywhere would also match). Tolerated only on the GM's page,
+// only within the index window captured around the sell-drop step (see the `sellWindow`
+// argument below), so a real regression producing the same generic message elsewhere
+// still fails.
+const SELL_EMIT_NULL_NAME = /Cannot read properties of null \(reading 'name'\)/;
+
+// assertNoUnexpectedErrors's third argument: { page, start, end } - a half-open [start,end)
+// index range into that page's own captured log (session.logs.get(page)) during which
+// SELL_EMIT_NULL_NAME is additionally tolerated. Built by the caller around the sell step.
+function assertNoUnexpectedErrors(session, label, sellWindow) {
+  const unexpected = [];
+  for (const [page, entries] of session.logs) {
+    entries.forEach((e, i) => {
+      const inSellWindow = sellWindow && page === sellWindow.page && i >= sellWindow.start && i < sellWindow.end;
+      const allowed = GENERAL_KNOWN_ERRORS.some((p) => p.test(e)) || (inSellWindow && SELL_EMIT_NULL_NAME.test(e));
+      if (allowed) console.log(`[${label}] tolerated known console error: ${e}`);
+      else unexpected.push(e);
+    });
+  }
   if (unexpected.length) throw new Error(`[${label}] browser console errors:\n${unexpected.join('\n')}`);
 }
 
@@ -159,7 +181,7 @@ function softOrHardAssert(broken, actual, expected, label, note, message) {
   assert.equal(actual, expected, `[${label}] ${message}: expected ${expected}, got ${actual}`);
 }
 
-for (const cfg of CASES) {
+async function runCase(cfg) {
   await withSession(`currency-systems-${cfg.label}`, { world: cfg.world, users: ['Gamemaster', 'User 1'] }, async (session) => {
     const gm = session.pages['Gamemaster'];
     const p1 = session.pages['User 1'];
@@ -303,6 +325,12 @@ for (const cfg of CASES) {
         return items[0].uuid;
       }, { actorId, data: cfg.sellItemData });
 
+      // Everything the sellItem-emit null-name bug (header comment #2) could plausibly
+      // fire from - the drop through the GM observing the item land in the shop - marked
+      // off by index into the GM's own captured log, for assertNoUnexpectedErrors below.
+      const gmLog = session.logs.get(gm) ?? [];
+      const sellWindowStart = gmLog.length;
+
       await openEntry(p1, shopId);
       await p1.waitForSelector('.shop-items', { state: 'attached', timeout: 15_000 });
       await dropOnSheet(p1, '.shop-items', { type: 'Item', uuid: sellItemUuid });
@@ -313,13 +341,14 @@ for (const cfg of CASES) {
         const items = game.journal.get(id)?.pages.contents[0]?.getFlag('monks-enhanced-journal', 'items') || {};
         return Object.values(items).some((i) => i.name === 'TT-currency-systems-sellitem');
       }, shopId, { timeout: 15_000 });
+      const sellWindowEnd = gmLog.length;
 
       const expectedAfterSell = expectedAfterPurchase + cfg.expectedSellCredit;
       const afterSell = await waitForCurrency(gm, actorId, cfg.currency, (v) => v === expectedAfterSell);
       softOrHardAssert(cfg.currencyMutationBroken, afterSell, expectedAfterSell,
         cfg.label, cfg.brokenNote, 'currency not credited after a sell');
 
-      assertNoUnexpectedErrors(session, cfg.label);
+      assertNoUnexpectedErrors(session, cfg.label, { page: gm, start: sellWindowStart, end: sellWindowEnd });
     } finally {
       await gm.evaluate(async ({ MODULE, originalPaths, originalCurrency }) => {
         for (const [k, v] of Object.entries(originalPaths)) await game.settings.set(MODULE, k, v);
@@ -331,6 +360,23 @@ for (const cfg of CASES) {
   });
 }
 
-// Both worlds above are switched to in turn by withSession's connect(); leave the
-// environment back on world-a for other specs/manual use.
-await withSession('currency-systems-restore-world-a', { world: 'world-a', users: ['Gamemaster'] }, async () => {});
+// Both worlds above are switched to in turn by withSession's connect(). The world-a
+// relaunch MUST run even if a case throws (assertion failure, timeout, ...) - the task
+// constraint is "restore world-a", not "restore world-a on success". withSession()
+// always closes its own session in its own finally regardless of how the callback
+// exits, so by the time this outer finally runs there is nothing from a dead case's
+// session left open to assume about - restoreWorldA() below opens a fresh one.
+async function restoreWorldA() {
+  // Logged, not rethrown: if a case above already threw, letting a restore failure
+  // replace it in `finally` would bury the real failure (JS finally-throw semantics
+  // discard whatever the try block was already unwinding with) - a restore problem is
+  // still visible here via stderr either way.
+  await withSession('currency-systems-restore-world-a', { world: 'world-a', users: ['Gamemaster'] }, async () => {})
+    .catch((e) => console.error(`currency-systems: failed to restore world-a: ${e.stack ?? e}`));
+}
+
+try {
+  for (const cfg of CASES) await runCase(cfg);
+} finally {
+  await restoreWorldA();
+}
