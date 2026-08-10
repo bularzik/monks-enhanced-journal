@@ -440,6 +440,36 @@ export const registerSettings = function () {
 		type: Boolean,
 	});
 
+	game.settings.register(modulename, "price-attribute", {
+		name: i18n("MonksEnhancedJournal.price-attribute.name"),
+		hint: i18n("MonksEnhancedJournal.price-attribute.hint"),
+		scope: "world",
+		config: true,
+		default: "",
+		type: String,
+		requiresReload: true
+	});
+
+	game.settings.register(modulename, "quantity-attribute", {
+		name: i18n("MonksEnhancedJournal.quantity-attribute.name"),
+		hint: i18n("MonksEnhancedJournal.quantity-attribute.hint"),
+		scope: "world",
+		config: true,
+		default: "",
+		type: String,
+		requiresReload: true
+	});
+
+	game.settings.register(modulename, "currency-attribute", {
+		name: i18n("MonksEnhancedJournal.currency-attribute.name"),
+		hint: i18n("MonksEnhancedJournal.currency-attribute.hint"),
+		scope: "world",
+		config: true,
+		default: "",
+		type: String,
+		requiresReload: true
+	});
+
 	game.settings.register(modulename, "loot-sheet", {
 		name: game.i18n.localize("MonksEnhancedJournal.loot-sheet.name"),
 		hint: game.i18n.localize("MonksEnhancedJournal.loot-sheet.hint"),
