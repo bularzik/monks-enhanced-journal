@@ -1,4 +1,4 @@
-// Four internal follow-up fixes, each its own check in one session:
+// Five internal follow-up fixes, each its own check in one session:
 //  1. transfer-currency crash when no currency flag exists yet
 //     (apps/transfer-currency.js:111).
 //  2. malformed migration-key document.update() calls in Person/Place
@@ -10,8 +10,13 @@
 //  4. CustomisePage.onSubmitForm throwing when a per-type adjustment row
 //     has no counterpart in the (possibly trimmed) default settings
 //     (apps/customise-page.js).
+//  5. MonksEnhancedJournal.sellItem crashing with "Cannot read properties
+//     of null (reading 'name')" (monks-enhanced-journal.js:3439) when a
+//     shop's "free" selling mode sells straight to the GM without an
+//     actorId (ShopSheet.js's free-sell _onDropItem branch never sent
+//     one - the offer/accept flow is the only caller that does).
 import assert from 'node:assert/strict';
-import { withSession, createEntry, openEntry, entryFlag, assertNoErrors } from '../helpers/mej.js';
+import { withSession, createEntry, openEntry, dropOnSheet, entryFlag, assertNoErrors } from '../helpers/mej.js';
 
 await withSession('internal-followups', { users: ['Gamemaster', 'User 1'] }, async (session) => {
   const gm = session.pages['Gamemaster'];
@@ -132,6 +137,60 @@ await withSession('internal-followups', { users: ['Gamemaster', 'User 1'] }, asy
     await gm.evaluate((orig) =>
       game.settings.set('monks-enhanced-journal', 'sheet-settings', orig), originalSheetSettings);
   }
+
+  // --- Check 5: sellItem crash on a "free" mode sale --------------------
+  // ShopSheet._onDropItem's free-selling branch emits sellItem with only
+  // { shopid, itemdata } (it already logs the sale itself, separately,
+  // with the actor pre-resolved). sellItem must not assume every caller
+  // sends actorId. Repro is deterministic per sale (fromUuid(undefined)
+  // synchronously returns null), so three sales is enough to cover it as
+  // a regression check without the cost of a long loop.
+  const sellerActorId = await gm.evaluate(async () => {
+    const user = game.users.getName('User 1');
+    const actor = await Actor.create({
+      name: 'TT-followup-seller', type: 'character',
+      system: { currency: { pp: 0, gp: 0, ep: 0, sp: 0, cp: 0 } },
+      ownership: { default: 0, [user.id]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER },
+    });
+    await user.update({ character: actor.id });
+    return actor.id;
+  });
+  const sellShopId = await createEntry(gm, 'shop', 'TT-followup-sell-shop', { selling: 'free', state: 'open' });
+  await p1.waitForFunction((id) => game.user.character?.id === id, sellerActorId, { timeout: 15_000 });
+  await p1.waitForFunction((id) => !!game.journal.get(id), sellShopId, { timeout: 15_000 });
+  await openEntry(p1, sellShopId);
+  await p1.waitForSelector('.shop-items', { state: 'attached', timeout: 15_000 });
+
+  for (let i = 0; i < 3; i++) {
+    const itemUuid = await gm.evaluate(async ({ actorId, i }) => {
+      const actor = game.actors.get(actorId);
+      const [item] = await actor.createEmbeddedDocuments('Item', [{
+        name: `TT-followup-sell-item-${i}`, type: 'loot',
+        system: { quantity: 1, price: { value: 5, denomination: 'gp' } },
+      }]);
+      return item.uuid;
+    }, { actorId: sellerActorId, i });
+
+    await dropOnSheet(p1, '.shop-items', { type: 'Item', uuid: itemUuid });
+    await p1.waitForSelector('dialog.dialog button[data-action="yes"]', { state: 'visible', timeout: 15_000 });
+    await p1.click('dialog.dialog button[data-action="yes"]');
+    await p1.waitForSelector('dialog.dialog', { state: 'detached', timeout: 15_000 });
+
+    await gm.waitForFunction(({ id, name }) => {
+      const items = game.journal.get(id)?.pages.contents[0]?.getFlag('monks-enhanced-journal', 'items');
+      return items && Object.values(items).some((it) => it.name === name);
+    }, { id: sellShopId, name: `TT-followup-sell-item-${i}` }, { timeout: 15_000 });
+
+    assertNoErrors(session);
+  }
+
+  await gm.waitForFunction((id) => {
+    const log = game.journal.get(id)?.pages.contents[0]?.getFlag('monks-enhanced-journal', 'log');
+    return Array.isArray(log) && log.length >= 3;
+  }, sellShopId, { timeout: 15_000 });
+  const sellLog = await entryFlag(gm, sellShopId, 'log');
+  assert.equal(sellLog.filter((l) => l.type === 'sell' && l.actor === 'TT-followup-seller').length, 3,
+    'expected 3 correctly-attributed sell log entries from the free-sell flow');
 
   assertNoErrors(session);
 });
