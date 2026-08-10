@@ -94,7 +94,12 @@ Two more permanent test worlds, alongside the existing seven (`test-pf2e`,
 **Test Symbaroum** (`test-symbaroum`, system `symbaroum` 6.1.6). Both have
 `monks-enhanced-journal` + `lib-wrapper` enabled, a blank-password Gamemaster,
 and a blank-password `User 1` player (added explicitly — fresh Foundry-created
-worlds only auto-create the Gamemaster).
+worlds only auto-create the Gamemaster). Both also have the world setting
+`monks-enhanced-journal.allow-player` set `true` (default `false`) — without
+it, `MonksEnhancedJournal.isAllowedToUseEnhancedJournal()` refuses every
+non-GM `openJournalEntry` call, which every other `test-*` world already had
+enabled from earlier sessions but these two didn't until `currency-systems.mjs`
+needed a player-side shop flow.
 
 **Installing a system package while a world is running**: the obvious `/join`
 "Return to Setup" form 403s with `ERROR.InvalidAdminKey` on this dev box —
@@ -147,7 +152,42 @@ this is exactly what the pre-existing hardcoded `case 'mythras':` branch in
 (`actor.items.find(i => i.type == "currency" && i.name == currency.name)`,
 `monks-enhanced-journal/sheets/EnhancedJournalSheet.js:1002-1007`). Item
 price/quantity are plain paths (`item.system.value`, `item.system.quantity`),
-but currency is not, and per Task 5's binding stop condition
-(`.superpowers/sdd/2026-08-10-enhancement-round-2/task-5-brief.md`) that
-blocks validating the `currency-attribute` setting end-to-end on Mythras —
-see `task-5-report.md` in the same directory for the full writeup.
+but currency is not.
+
+### Validation outcome (ruling: validate both systems, zero new product code)
+
+The initial stop-condition flag on Mythras was overruled: since MEJ already
+has a working, Task-4-independent hardcoded branch for Mythras's embedded-item
+currency (cited above), the ruling was to validate both systems against it as
+configured (`currency-attribute` left **blank** for Mythras — that setting is
+irrelevant there, the hardcoded branch bypasses `currencyname()` entirely) and
+treat any failure *inside* that pre-existing branch as a documented, not-fixed
+outcome. `test/specs/currency-systems.mjs` does this, parameterized over both
+worlds:
+
+- **Symbaroum**: `price-attribute: "cost"`, `quantity-attribute: "number"`,
+  `currency-attribute: "money"`, Edit Currency denomination ids
+  `thaler`/`shilling`/`orteg` (must equal the `system.money` object keys) —
+  fully validated end-to-end, every currency mutation is a hard assertion
+  (price renders on drop, purchase deducts, sell credits).
+- **Mythras**: `price-attribute: "value"`, `quantity-attribute`/
+  `currency-attribute` left blank, Edit Currency denomination **name** set to
+  match the actor's embedded `currency`-type Item's name exactly (that's how
+  `getCurrency`'s mythras branch finds it) — price-on-drop and "item lands on
+  actor" are hard assertions; the two currency-mutation assertions
+  (purchase-deducts, sell-credits) are soft/logged rather than thrown, because
+  `EnhancedJournalSheet.addCurrency`'s mythras branch has a real, pre-existing
+  bug: `EnhancedJournalSheet.js:1162` compares `i.name == currency` (the whole
+  currency-row object from `MonksEnhancedJournal.currencies`) instead of
+  `i.name == currency.name`, so it can never match the embedded Item and
+  silently no-ops. `getCurrency` (the read/affordability side, used to decide
+  whether a purchase/sell is even allowed) is correct and unaffected — only
+  the write side is broken. Not fixed here (zero new product code per the
+  ruling on this task); see `task-5-report.md` in the same directory for the
+  full writeup and two more tolerated-but-unrelated bugs the spec's console
+  filter documents (a `ShopSheet` sell-emit missing `actorId`, and two
+  Symbaroum-system-side data-preparation reentrancy quirks).
+
+`node run.mjs currency-systems` passes green (both cases); full suite is
+10/12 (`internal-followups.mjs`/`price-tiers-world.mjs` fail as expected —
+sibling-branch specs not present on `enh/currency-config`).
