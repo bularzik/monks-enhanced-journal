@@ -346,7 +346,21 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     }
 
     fieldlist() {
-        return null;
+        let settings = this.sheetSettings() || {};
+        let fields = MonksEnhancedJournal.convertObjectToArray(settings?.attributes);
+        let attributes = this.document.flags['monks-enhanced-journal'].attributes || {};
+        return fields
+            .filter(f => f.shown && (game.user.isGM || !f.playerHidden))
+            .map(f => {
+                let attr = attributes[f.id];
+                return {
+                    id: f.id,
+                    name: f.name,
+                    value: attr,
+                    full: f.full,
+                    playerHidden: !!f.playerHidden && game.user.isGM
+                }
+            });
     }
 
     render(options) {

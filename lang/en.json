@@ -661,6 +661,15 @@
   "MonksEnhancedJournal.setting.attributes": "Fields",
   "MonksEnhancedJournal.setting.adjustment": "Prices",
 
+  "MonksEnhancedJournal.Headquarters": "Headquarters",
+  "MonksEnhancedJournal.Scope": "Scope",
+  "MonksEnhancedJournal.Founded": "Founded",
+  "MonksEnhancedJournal.EventDuration": "Duration",
+  "MonksEnhancedJournal.Outcome": "Outcome",
+  "MonksEnhancedJournal.Region": "Region",
+  "MonksEnhancedJournal.Terrain": "Terrain",
+  "MonksEnhancedJournal.Discovered": "Discovered",
+
   "MonksEnhancedJournal.THEME": {
     "enhancedjournal": "Enhanced Journal"
   },

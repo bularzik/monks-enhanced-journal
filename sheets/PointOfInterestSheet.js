@@ -19,6 +19,7 @@ export class PointOfInterestSheet extends EnhancedJournalSheet {
             templates: [
                 "modules/monks-enhanced-journal/templates/sheets/partials/sheet-detailed-header.hbs",
                 "modules/monks-enhanced-journal/templates/sheets/partials/sheet-textentry.hbs",
+                "modules/monks-enhanced-journal/templates/sheets/partials/sheet-details.hbs",
                 "modules/monks-enhanced-journal/templates/sheets/partials/sheet-relationships.hbs",
                 "modules/monks-enhanced-journal/templates/sheets/partials/sheet-notes.hbs",
                 "templates/generic/tab-navigation.hbs",
@@ -35,6 +36,7 @@ export class PointOfInterestSheet extends EnhancedJournalSheet {
         primary: {
             tabs: [
                 { id: "description", icon: "fa-solid fa-file-signature" },
+                { id: "entry-details", icon: "fa-solid fa-table" },
                 { id: "relationships", icon: "fa-solid fa-users" },
                 { id: "notes", icon: "fa-solid fa-paperclip" },
             ],
@@ -51,6 +53,8 @@ export class PointOfInterestSheet extends EnhancedJournalSheet {
         context = await super._prepareBodyContext(context, options);
 
         context.relationships = await this.getRelationships();
+
+        context.detailFields = this.fieldlist();
 
         context.has = {
             relationships: Object.keys(context.relationships || {})?.length > 0
