@@ -95,6 +95,9 @@ export class MonksEnhancedJournal {
 	static _oldSheetClass;
 	static journal;
 	static sounds = [];
+	// Id of the JournalEntry whose core "createJournalEntry" sheet render we
+	// blocked, so JournalEntry._onCreate knows it still owes that entry an open.
+	static suppressedCreateRender = null;
 
 	static pricename = "price";
 	static quantityname = "quantity";
@@ -956,9 +959,45 @@ export class MonksEnhancedJournal {
 					}, 500);
 				}
 			}
-			if (!!foundry.utils.getProperty(this, "flags.forien-quest-log") || (options.renderSheet !== false && !await MonksEnhancedJournal.openJournalEntry(this, options)))
+			// Foundry's ClientDocument.createDialog() creates with renderSheet:false and
+			// renders doc.sheet itself, so renderSheet alone can't tell us whether this
+			// entry is going to be shown.  The render patch below blocks that core
+			// render for Enhanced Journal entries and flags the entry here instead.
+			let suppressed = MonksEnhancedJournal.suppressedCreateRender == this.id;
+			if (suppressed)
+				MonksEnhancedJournal.suppressedCreateRender = null;
+			if (!!foundry.utils.getProperty(this, "flags.forien-quest-log") || ((options.renderSheet !== false || suppressed) && !await MonksEnhancedJournal.openJournalEntry(this, options)))
 				return wrapped(...args);
 		}, "MIXED");
+
+		// The sidebar's "Create Journal Entry" button goes through
+		// ClientDocument.createDialog(), which calls create() with renderSheet:false
+		// and then renders doc.sheet directly from the dialog's ok callback
+		// (client/documents/abstract/client-document.mjs).  That bypasses the
+		// renderSheet guard in the _onCreate patch above, so an entry created as a
+		// Shop/Loot/Quest/... opened in the plain core note sheet instead of the
+		// Enhanced Journal.  Swallow that one render and let _onCreate open the entry
+		// properly once it has built the entry's page.
+		patchFunc("foundry.applications.sheets.journal.JournalEntrySheet.prototype.render", function (wrapped, ...args) {
+			let options = (typeof args[0] == "object" ? args[0] : args[1]) || {};
+			if (options.renderContext == "createJournalEntry"
+				&& !setting("open-outside")
+				&& MonksEnhancedJournal.isAllowedToUseEnhancedJournal()) {
+				let type = (foundry.utils.getProperty(this.document, "flags.monks-enhanced-journal.pagetype") || "").split(":")[0];
+				if (type == "base" || type == "oldentry") type = "journalentry";
+				let types = MonksEnhancedJournal.getDocumentTypes();
+				if (types[type]) {
+					// _onCreate runs concurrently with this render; whichever of the two
+					// gets here second is the one that opens the entry.
+					if (this.document.pages.size)
+						MonksEnhancedJournal.openJournalEntry(this.document, {});
+					else
+						MonksEnhancedJournal.suppressedCreateRender = this.document.id;
+					return this;
+				}
+			}
+			return wrapped(...args);
+		});
 
 		/*
 		patchFunc("JournalEntryPage.prototype._onCreate". async function (wrapped, ...args) {
