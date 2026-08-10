@@ -95,9 +95,6 @@ export class MonksEnhancedJournal {
 	static _oldSheetClass;
 	static journal;
 	static sounds = [];
-	// Id of the JournalEntry whose core "createJournalEntry" sheet render we
-	// blocked, so JournalEntry._onCreate knows it still owes that entry an open.
-	static suppressedCreateRender = null;
 
 	static pricename = "price";
 	static quantityname = "quantity";
@@ -200,6 +197,33 @@ export class MonksEnhancedJournal {
 				return type;
 		}
 		return false;
+	}
+
+	// Resolves true once `document` has at least one page, false if none has shown
+	// up within `timeout` ms.  Used when a JournalEntry's sheet is asked to render
+	// while the entry's first page is still being created asynchronously.
+	static waitForFirstPage(document, timeout = 5000) {
+		if (document?.pages?.size)
+			return Promise.resolve(true);
+		return new Promise((resolve) => {
+			let hookId, timer;
+			let finish = (result) => {
+				if (hookId == undefined)
+					return;
+				Hooks.off("createJournalEntryPage", hookId);
+				hookId = undefined;
+				window.clearTimeout(timer);
+				resolve(result);
+			};
+			hookId = Hooks.on("createJournalEntryPage", (page) => {
+				if (page?.parent?.id == document?.id)
+					finish(true);
+			});
+			timer = window.setTimeout(() => finish(false), timeout);
+			// Guard against the page landing between the size check and the hook.
+			if (document?.pages?.size)
+				finish(true);
+		});
 	}
 
 	static convertObjectToArray(obj) {
@@ -960,14 +984,7 @@ export class MonksEnhancedJournal {
 					}, 500);
 				}
 			}
-			// Foundry's ClientDocument.createDialog() creates with renderSheet:false and
-			// renders doc.sheet itself, so renderSheet alone can't tell us whether this
-			// entry is going to be shown.  The render patch below blocks that core
-			// render for Enhanced Journal entries and flags the entry here instead.
-			let suppressed = MonksEnhancedJournal.suppressedCreateRender == this.id;
-			if (suppressed)
-				MonksEnhancedJournal.suppressedCreateRender = null;
-			if (!!foundry.utils.getProperty(this, "flags.forien-quest-log") || ((options.renderSheet !== false || suppressed) && !await MonksEnhancedJournal.openJournalEntry(this, options)))
+			if (!!foundry.utils.getProperty(this, "flags.forien-quest-log") || (options.renderSheet !== false && !await MonksEnhancedJournal.openJournalEntry(this, options)))
 				return wrapped(...args);
 		}, "MIXED");
 
@@ -977,9 +994,9 @@ export class MonksEnhancedJournal {
 		// (client/documents/abstract/client-document.mjs).  That bypasses the
 		// renderSheet guard in the _onCreate patch above, so an entry created as a
 		// Shop/Loot/Quest/... opened in the plain core note sheet instead of the
-		// Enhanced Journal.  Swallow that one render and let _onCreate open the entry
-		// properly once it has built the entry's page.
-		patchFunc("foundry.applications.sheets.journal.JournalEntrySheet.prototype.render", function (wrapped, ...args) {
+		// Enhanced Journal.  Take over that one render.
+		// MIXED, not WRAPPER: we conditionally don't chain to the core render.
+		patchFunc("foundry.applications.sheets.journal.JournalEntrySheet.prototype.render", async function (wrapped, ...args) {
 			let options = (typeof args[0] == "object" ? args[0] : args[1]) || {};
 			if (options.renderContext == "createJournalEntry"
 				&& !setting("open-outside")
@@ -988,17 +1005,18 @@ export class MonksEnhancedJournal {
 				if (type == "base" || type == "oldentry") type = "journalentry";
 				let types = MonksEnhancedJournal.getDocumentTypes();
 				if (types[type]) {
-					// _onCreate runs concurrently with this render; whichever of the two
-					// gets here second is the one that opens the entry.
-					if (this.document.pages.size)
-						MonksEnhancedJournal.openJournalEntry(this.document, {});
-					else
-						MonksEnhancedJournal.suppressedCreateRender = this.document.id;
-					return this;
+					// This render fires while _onCreate above is still building the entry's
+					// first page, so wait for that page before opening - otherwise the
+					// Enhanced Journal would open on an empty entry.  If the page never
+					// arrives, or the Enhanced Journal declines to open it, fall through to
+					// the core sheet rather than leaving the user with nothing.
+					if (await MonksEnhancedJournal.waitForFirstPage(this.document)
+						&& await MonksEnhancedJournal.openJournalEntry(this.document, {}))
+						return this;
 				}
 			}
 			return wrapped(...args);
-		});
+		}, "MIXED");
 
 		/*
 		patchFunc("JournalEntryPage.prototype._onCreate". async function (wrapped, ...args) {
