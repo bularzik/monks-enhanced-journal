@@ -8,9 +8,11 @@
 // EnhancedJournalSheet#sheetSettings()/MEJHelpers.adjustmentRate() actually resolve against,
 // and exercises three dialog UX papercuts along the way (type-row edits surviving an
 // addTier/removeTier re-render, Reset clearing tier rows, and negative tier rates being
-// clamped).
+// clamped). Also covers ShopSheet#convertItems (the "Convert Shop Items" button, document
+// mode only) actually picking up those same world defaults/tiers for a shop with no local
+// override, rather than the orphaned "adjustment-defaults" setting it used to read.
 import assert from 'node:assert/strict';
-import { withSession, createEntry, assertNoErrors } from '../helpers/mej.js';
+import { withSession, createEntry, openEntry, assertNoErrors } from '../helpers/mej.js';
 
 await withSession('price-tiers-world', { users: ['Gamemaster'] }, async (session) => {
   const gm = session.pages['Gamemaster'];
@@ -86,6 +88,50 @@ await withSession('price-tiers-world', { users: ['Gamemaster'] }, async (session
     assert.equal(
       resolvedSell, 0.5,
       `expected the world price tier (0.5) to resolve for a 150gp item with no shop override, got ${resolvedSell}`
+    );
+
+    // --- Convert Shop Items (document-mode dialog) must also use the world tier -------------
+    const itemId = await gm.evaluate(async (id) => {
+      const page = game.journal.get(id).pages.contents[0];
+      const items = foundry.utils.duplicate(page.getFlag('monks-enhanced-journal', 'items') || {});
+      const itemId = foundry.utils.randomID();
+      items[itemId] = {
+        _id: itemId,
+        name: 'TT-price-tier-item',
+        type: 'loot',
+        flags: { 'monks-enhanced-journal': { price: '150 gp', quantity: 1 } },
+      };
+      await page.setFlag('monks-enhanced-journal', 'items', items);
+      return itemId;
+    }, shopId);
+
+    await openEntry(gm, shopId);
+    await gm.waitForSelector('.monks-enhanced-journal [data-tab="items"]', { timeout: 15_000 });
+    await gm.click('.monks-enhanced-journal [data-tab="items"]');
+    await gm.waitForSelector('.monks-enhanced-journal [data-action="adjustPrice"]', { timeout: 15_000 });
+    await gm.click('.monks-enhanced-journal [data-action="adjustPrice"]');
+    await gm.waitForSelector('#adjust-price', { state: 'visible', timeout: 15_000 });
+    // Leave every field untouched (no local override) and hit Convert - the resolved rate must
+    // fall through to the world tier, not the stale adjustment-defaults {sell:1, buy:0.5}.
+    await gm.click('#adjust-price [data-action="convert"]');
+    await gm.waitForFunction(
+      (args) => game.journal.get(args.id)?.pages.contents[0]
+        ?.getFlag('monks-enhanced-journal', 'items')?.[args.itemId]
+        ?.flags?.['monks-enhanced-journal']?.cost === '75 gp',
+      { id: shopId, itemId },
+      { timeout: 15_000 }
+    );
+    await gm.evaluate(() => foundry.applications.instances.get('adjust-price')?.close());
+    await gm.evaluate(() => foundry.applications.instances.get('MonksEnhancedJournal')?.close());
+
+    const convertedCost = await gm.evaluate((args) =>
+      game.journal.get(args.id).pages.contents[0]
+        .getFlag('monks-enhanced-journal', 'items')[args.itemId]
+        .flags['monks-enhanced-journal'].cost,
+      { id: shopId, itemId });
+    assert.equal(
+      convertedCost, '75 gp',
+      `expected Convert Shop Items to bake in the world tier rate (150gp * 0.5 = 75gp), got ${convertedCost}`
     );
 
     assertNoErrors(session);
