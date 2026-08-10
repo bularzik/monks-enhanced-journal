@@ -85,3 +85,69 @@ when an assertion throws mid-world. All machine-specific paths are in the
 
 Adjust the exclusion list against what previous releases shipped (compare with
 `unzip -l` of the prior release's module.zip) before uploading.
+
+## `test-mythras` / `test-symbaroum` worlds (added 2026-08-10, currency-config validation)
+
+Two more permanent test worlds, alongside the existing seven (`test-pf2e`,
+`test-dsa5`, `test-dcc`, `test-dnd4e`, `test-wfrp4e`, `test-sfrpg`,
+`test-fallout`): **Test Mythras** (`test-mythras`, system `mythras` 2.3.0) and
+**Test Symbaroum** (`test-symbaroum`, system `symbaroum` 6.1.6). Both have
+`monks-enhanced-journal` + `lib-wrapper` enabled, a blank-password Gamemaster,
+and a blank-password `User 1` player (added explicitly — fresh Foundry-created
+worlds only auto-create the Gamemaster).
+
+**Installing a system package while a world is running**: the obvious `/join`
+"Return to Setup" form 403s with `ERROR.InvalidAdminKey` on this dev box —
+`JoinView.handlePost`'s `shutdown` case requires a server admin password to be
+*configured at all* (`Config/admin.txt`), which this box has none of, so that
+gate always rejects it regardless of what's submitted. `helpers/foundry.js`
+`ensureWorld()` used to drive exactly that broken form (nothing had ever
+exercised a world-to-world switch before this session — every prior spec only
+ever used `world-a`); it's fixed now to reproduce what the in-game GM "Return
+to Setup" control actually does: log in as Gamemaster, then
+`POST /setup {shutdown:true}` from that authenticated session
+(`World#deactivate` only needs the requesting session to resolve to a
+GAMEMASTER-role user — no admin password involved). From an inactive server,
+package installs and world creation are the plain setup/create POST actions
+(`POST /setup {action:"installPackage", type:"system", id, manifest}`,
+`POST /create {action:"createWorld", id, title, system}`), both effectively
+unauthenticated here since `config.adminPassword` is null.
+
+**Symbaroum's published manifest (6.1.6) caps `compatibility.maximum` at 13**
+— Foundry refuses to launch a world using it as installed (`World.get` throws
+"package ... is not available for use"). Worked around for this dev box only
+by hand-patching `compatibility.maximum` to `"14"` in both the installed
+`Data/Data/systems/symbaroum/system.json` and `Data/Data/worlds/test-symbaroum/world.json`,
+then `POST /setup {action:"resetPackages"}` to drop Foundry's in-memory
+package cache before relaunching. The system otherwise loads and runs cleanly
+on v14 (no console errors). Mythras (2.3.0) advertises v11–v13 verified but
+has no hard `maximum` cap and launched as published.
+
+### Discovered schemas (enh/currency-config Task 5)
+
+Both worlds' actor/item schemas were dumped by creating a real `Actor` +
+`Item` as GM and inspecting `.system` (see the (gitignored) probe scripts this
+session used, `scratch/tt-discover-*.mjs`, for the exact repro if needed
+again).
+
+**Symbaroum** — a plain object path, exactly as anticipated:
+- currency: `actor.system.money` = `{ thaler, shilling, orteg }` (flat
+  numbers, no `{value:}` wrapper)
+- item price: `item.system.cost` (string, e.g. `""` — not the module's
+  `price` default)
+- item quantity: `item.system.number` (not `quantity`)
+
+**Mythras** — **not** a plain object path. `actor.system` has no currency
+field of any kind (keys: `characteristics`, `trackedStats`, `attributes`,
+`currentLuckPoints`, ... — see the probe script output). Currency is instead
+held as embedded `Item` documents of `type: "currency"` on the actor (e.g. a
+"Silver Pieces" item with `system.quantity` = the amount), matched by name —
+this is exactly what the pre-existing hardcoded `case 'mythras':` branch in
+`EnhancedJournalSheet.getCurrency`/`addCurrency` already assumes
+(`actor.items.find(i => i.type == "currency" && i.name == currency.name)`,
+`monks-enhanced-journal/sheets/EnhancedJournalSheet.js:1002-1007`). Item
+price/quantity are plain paths (`item.system.value`, `item.system.quantity`),
+but currency is not, and per Task 5's binding stop condition
+(`.superpowers/sdd/2026-08-10-enhancement-round-2/task-5-brief.md`) that
+blocks validating the `currency-attribute` setting end-to-end on Mythras —
+see `task-5-report.md` in the same directory for the full writeup.

@@ -34,28 +34,73 @@ export async function ensureServer() {
 }
 
 // Activate worldId if it isn't already the live world.
-// Join page: templates/views/join.hbs; "Return to Setup" form has input[name="adminPassword"]
-// (no admin password is set). Setup page world tiles: [data-package-id] with
-// a.control.play[data-action="worldLaunch"] (templates/setup/parts/package-tiles.hbs:18).
+// Join page: templates/views/join.hbs. Setup page world tiles: [data-package-id]
+// with a.control.play[data-action="worldLaunch"] (templates/setup/parts/package-tiles.hbs:18).
 // Foundry refuses to run properly (and logs a console.error on every load)
 // below this resolution — keep every context at least this large so specs
 // that assert a clean console aren't tripped up by an unrelated warning.
 const VIEWPORT = { width: 1366, height: 768 };
 
-async function ensureWorld(browser, worldId) {
-  const status = await apiStatus();
-  if (status?.world === worldId) return;
+// Return to the setup screen from a running world. The obvious UI path — the
+// /join page's "Return to Setup" form (input[name="adminPassword"]) — 403s
+// with ERROR.InvalidAdminKey on this dev box: dist/server/views/join.mjs
+// JoinView.handlePost's "shutdown" case explicitly requires a server admin
+// password to be CONFIGURED at all (`if(!t.adminPassword) return 403`), and
+// this box has none (no Config/admin.txt). That gate exists independent of
+// what password value you submit — blank or otherwise, it always 403s here.
+// The real in-game "Return to Setup" affordance goes through a different
+// route instead: POST /setup {shutdown:true} from a session already logged
+// in as a world user. dist/server/views/setup.mjs SetupView.handlePost, when
+// a world is active, special-cases `body.shutdown` before the admin-only
+// switch below it, and dist/packages/world.mjs World#deactivate only needs
+// `e.user` to resolve to a GAMEMASTER-role user (or an already-admin
+// session) — no adminPassword involved. So: join as Gamemaster, then fire
+// that POST from the authenticated page.
+async function returnToSetup(browser) {
   const context = await browser.newContext({ viewport: VIEWPORT });
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
   try {
-    if (status?.world) {
-      await page.goto(`${BASE}/join`);
-      await page.locator('form:has(input[name="adminPassword"]) button[type="submit"], form:has-text("Return to Setup") button[type="submit"]').first().click();
-      await page.waitForURL('**/setup**');
-    } else {
-      await page.goto(`${BASE}/setup`);
-    }
+    await page.goto(`${BASE}/join`);
+    await page.waitForSelector('select[name="userid"]');
+    const found = await page.evaluate(() => {
+      const select = document.querySelector('select[name="userid"]');
+      const option = Array.from(select.options).find((o) => o.textContent.trim() === 'Gamemaster');
+      if (!option) return false;
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    });
+    if (!found) throw new Error('returnToSetup: no Gamemaster user option on /join');
+    await page.click('button[name="join"]');
+    await page.waitForFunction(() => window.game?.ready === true, null, { timeout: 30_000 });
+    await page.evaluate(async () => {
+      await fetch('/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shutdown: true }),
+      });
+    });
+  } finally {
+    await context.close();
+  }
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (!(await apiStatus())?.world) return;
+    await sleep(500);
+  }
+  throw new Error('returnToSetup: world still active 30s after shutdown request');
+}
+
+async function ensureWorld(browser, worldId) {
+  const status = await apiStatus();
+  if (status?.world === worldId) return;
+  if (status?.world) await returnToSetup(browser);
+  const context = await browser.newContext({ viewport: VIEWPORT });
+  const page = await context.newPage();
+  page.setDefaultTimeout(TIMEOUT);
+  try {
+    await page.goto(`${BASE}/setup`);
     // A first-run "welcome tour" (e.g. "Backups Overview") can render a
     // full-page overlay on /setup that intercepts every click, and the
     // world tile's own play icon is `visibility:hidden` until the tile is
