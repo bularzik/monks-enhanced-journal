@@ -5,7 +5,12 @@
             {{#unless field.full}}
             <li {{#if field.hidden}} style="display:none;" {{/if}}>
                 <label>{{localize field.name}}</label>
+                {{#if field.enriched}}
+                <div class="mej-field-display" data-field="{{field.id}}">{{{field.enriched}}}</div>
+                <input type="text" class="mej-field-edit" style="display:none" name="flags.monks-enhanced-journal.attributes.{{field.id}}" value="{{ field.value }}" />
+                {{else}}
                 <input type="text" name="flags.monks-enhanced-journal.attributes.{{field.id}}" value="{{ field.value }}" />
+                {{/if}}
             </li>
             {{/unless}}
             {{/each}}
@@ -17,7 +22,12 @@
     {{#if field.full}}
     <div class="form-group" {{#if field.hidden}} style="display:none;" {{/if}}>
         <label>{{localize field.name}}</label>
+        {{#if field.enriched}}
+        <div class="mej-field-display" data-field="{{field.id}}">{{{field.enriched}}}</div>
+        <textarea class="mej-field-edit" style="display:none" name="flags.monks-enhanced-journal.attributes.{{field.id}}">{{field.value}}</textarea>
+        {{else}}
         <textarea name="flags.monks-enhanced-journal.attributes.{{field.id}}">{{field.value}}</textarea>
+        {{/if}}
     </div>
     {{/if}}
     {{/each}}

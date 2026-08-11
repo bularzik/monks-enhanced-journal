@@ -155,7 +155,7 @@ export class PlaceSheet extends EnhancedJournalSheet {
             v.documents = v.documents.sort((a, b) => a.name.localeCompare(b.name));
         }
 
-        context.detailFields = this.fieldlist();
+        context.detailFields = await this.enrichFields(this.fieldlist());
 
         context.has = {
             relationships: Object.keys(context.relationships || {})?.length > 0,
@@ -163,10 +163,10 @@ export class PlaceSheet extends EnhancedJournalSheet {
             shops: context.shops?.shop.documents.length > 0
         }
 
-        context.fields = [
+        context.fields = await this.enrichFields([
             { id: 'placetype', label: "MonksEnhancedJournal.Type", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.placetype") },
             { id: 'location', label: "MonksEnhancedJournal.Location", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.location") }
-        ]
+        ])
         context.placeholder = "MonksEnhancedJournal.Place";
 
         return context;

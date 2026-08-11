@@ -35,7 +35,12 @@
             {{else if (eq field.type "checkbox")}}
             <input type="checkbox" name="flags.monks-enhanced-journal.{{field.id}}" {{checked field.value}} />
             {{else}}
+            {{#if field.enriched}}
+            <div class="mej-field-display" data-field="{{field.id}}">{{{field.enriched}}}</div>
+            <input type="text" class="mej-field-edit" style="display:none" name="flags.monks-enhanced-journal.{{field.id}}" value="{{ field.value }}" />
+            {{else}}
             <input type="text" name="flags.monks-enhanced-journal.{{field.id}}" value="{{ field.value }}" />
+            {{/if}}
             {{/if}}
             {{else}}
             <div>{{{ field.value }}}</div>

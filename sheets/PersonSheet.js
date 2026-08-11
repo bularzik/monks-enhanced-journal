@@ -106,7 +106,7 @@ export class PersonSheet extends EnhancedJournalSheet {
         }
         context.canViewActor = !!context.actor
 
-        context.detailFields = this.fieldlist();
+        context.detailFields = await this.enrichFields(this.fieldlist());
 
         let currency = (context.data.flags['monks-enhanced-journal'].currency || []);
         context.currency = MonksEnhancedJournal.currencies.map(c => {
@@ -120,10 +120,10 @@ export class PersonSheet extends EnhancedJournalSheet {
             offerings: context.offerings?.length > 0
         }
 
-        context.fields = [
+        context.fields = await this.enrichFields([
             { id: 'role', label: "MonksEnhancedJournal.Role", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.role") },
             { id: 'location', label: "MonksEnhancedJournal.Location", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.location") }
-        ]
+        ])
         context.placeholder = "MonksEnhancedJournal.PersonName";
 
         context.hasRollTables = !!game.packs.get("monks-enhanced-journal.person-names") && this.document.isOwner;

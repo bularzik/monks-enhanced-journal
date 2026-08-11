@@ -491,6 +491,33 @@ body:not(.system-pf2e) .monks-journal-sheet .sheet-container .tag {
     border-bottom-right-radius: 0px;
 }
 
+.monks-journal-sheet.sheet .sheet-body .details-section .mej-field-display {
+    flex: 1;
+    border: var(--mej-sheet-input-border);
+    background: var(--mej-sheet-input-background);
+    color: var(--mej-sheet-input-color);
+    padding: 1px 3px;
+    border-radius: 3px;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.monks-journal-sheet.sheet .journal-sheet-header .header-details .mej-field-display {
+    flex: 1;
+    background: var(--mej-sheet-header-input-background);
+    border: var(--mej-sheet-header-input-border);
+    color: var(--mej-sheet-header-detail-input-color);
+    font-size: var(--font-size-20);
+    padding: 1px 3px;
+    border-radius: 3px;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Document Details */
 .monks-journal-sheet.sheet .document-details {
     border-radius: 5px;

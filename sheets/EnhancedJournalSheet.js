@@ -349,6 +349,15 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         return null;
     }
 
+    async enrichFields(fields) {
+        for (let f of fields) {
+            f.enriched = (typeof f.value === "string" && /@\w+\[[^\]]+\]/.test(f.value))
+                ? await foundry.applications.ux.TextEditor.implementation.enrichHTML(f.value, { relativeTo: this.document, secrets: this.document.isOwner })
+                : null;
+        }
+        return fields;
+    }
+
     render(options) {
         let { force = this.tempOwnership } = options || {};
         if (force && (!this.document.testUserPermission(game.user, "OBSERVER") || (this.document.parent && !this.document.parent.testUserPermission(game.user, "OBSERVER")))) {
@@ -503,6 +512,88 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         }
     }
 
+    async _onDropFieldLink(event) {
+        event.preventDefault();
+        let data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event.originalEvent ?? event);
+        if (!data?.uuid)
+            return;
+
+        let input = event.currentTarget;
+        let doc = await fromUuid(data.uuid);
+        let text = `@UUID[${data.uuid}]{${doc?.name ?? "Link"}}`;
+
+        let start = input.selectionStart ?? input.value.length;
+        let end = input.selectionEnd ?? input.value.length;
+        input.focus();
+        input.setRangeText(text, start, end, "end");
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    // A `.mej-field-display` can be entirely filled by its content-link
+    // anchor (e.g. a header field where the display div is wider than the
+    // link text), so the first half of a genuine double-click lands on the
+    // anchor itself and would otherwise fire MEJ's own content-link routing
+    // (JournalEntry/JournalEntryPage#_onClickDocumentLink) immediately,
+    // navigating away before the second click can register as a dblclick.
+    // Debounce single clicks on the anchor briefly so a following click
+    // (making this a dblclick) can cancel the navigation and let
+    // _onFieldDisplayDblClick swap to edit mode instead. A lone click still
+    // opens the link, just after the disambiguation window - by calling the
+    // document's own `_onClickDocumentLink` (the same delegate MEJ already
+    // patches for its normal content-link routing, e.g. openJournalEntry),
+    // not a new router. A direct call is used rather than re-dispatching a
+    // synthetic click because Foundry's global content-link listener ignores
+    // untrusted (script-dispatched) events.
+    async _onFieldDisplayClick(event) {
+        let anchor = event.target.closest("a.content-link, a[data-link]");
+        if (!anchor)
+            return;
+
+        let display = event.currentTarget;
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (event.detail > 1) {
+            // second (or later) click of the pair - cancel the pending
+            // single-click navigation; the dblclick handler takes it from here.
+            clearTimeout(display._mejLinkClickTimer);
+            display._mejLinkClickTimer = null;
+            return;
+        }
+
+        let { altKey, ctrlKey, metaKey, shiftKey } = event;
+        display._mejLinkClickTimer = setTimeout(async () => {
+            display._mejLinkClickTimer = null;
+            let doc = anchor.dataset.uuid ? await fromUuid(anchor.dataset.uuid) : null;
+            if (!doc && anchor.dataset.type && anchor.dataset.id)
+                doc = game.collections.get(anchor.dataset.type)?.get(anchor.dataset.id);
+            if (doc?._onClickDocumentLink)
+                doc._onClickDocumentLink({ target: anchor, altKey, ctrlKey, metaKey, shiftKey, preventDefault: () => { } });
+        }, 300);
+    }
+
+    _onFieldDisplayDblClick(event) {
+        let display = event.currentTarget;
+        clearTimeout(display._mejLinkClickTimer);
+        display._mejLinkClickTimer = null;
+        let input = display.nextElementSibling;
+        if (!input)
+            return;
+        $(display).hide();
+        $(input).show();
+        input.focus();
+    }
+
+    _onFieldEditBlur(event) {
+        let input = event.currentTarget;
+        let display = input.previousElementSibling;
+        if (display?.classList?.contains("mej-field-display")) {
+            $(input).hide();
+            $(display).show();
+        }
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
     async _onRender(context, options) {
         super._onRender(context, options);
 
@@ -578,6 +669,13 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
 
         $("a.picture-link", html).click(MonksEnhancedJournal._onClickPictureLink.bind(this));
         $("img:not(.nopopout)", html).click(this._onClickImage.bind(this));
+
+        $(".document-details input, .document-details textarea, .details-section textarea, .header-details .form-group input[type='text']", html)
+            .on("dragover", (event) => event.preventDefault())
+            .on("drop", this._onDropFieldLink.bind(this));
+        $(".mej-field-display", html).on("click", this._onFieldDisplayClick.bind(this));
+        $(".mej-field-display", html).on("dblclick", this._onFieldDisplayDblClick.bind(this));
+        $(".mej-field-edit", html).on("blur", this._onFieldEditBlur.bind(this));
 
         $('a[href^="#"]', html).click(this._onClickAnchor.bind(this));
 
