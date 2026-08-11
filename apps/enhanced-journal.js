@@ -1980,10 +1980,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                 // no-op. Mirror the codebase's standard fallback pattern used at every
                 // other openJournalEntry call site (e.g. monks-enhanced-journal.js:764):
                 // fall back to the document's own core sheet when MEJ declines to open it.
-                // (This branch predates enh/open-behavior's altOpensOutside() helper, so
-                // event.altKey is used directly here, matching what that call site itself
-                // used before altOpensOutside existed.)
-                if (event.altKey || setting('open-outside') || !await MonksEnhancedJournal.openJournalEntry(entry)) {
+                if (MonksEnhancedJournal.altOpensOutside(event) || setting('open-outside') || !await MonksEnhancedJournal.openJournalEntry(entry)) {
                     entry.sheet.render(true);
                 }
             });
