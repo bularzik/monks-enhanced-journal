@@ -292,6 +292,11 @@ export class MonksEnhancedJournal {
 			MonksEnhancedJournal.pricename = "value";
 		}
 
+		if (setting("price-attribute")) MonksEnhancedJournal.pricename = setting("price-attribute");
+		if (setting("quantity-attribute")) MonksEnhancedJournal.quantityname = setting("quantity-attribute");
+		let currencyAttribute = setting("currency-attribute");
+		if (currencyAttribute) MonksEnhancedJournal.currencyname = (currencyAttribute === "." ? "" : currencyAttribute);
+
 		game.MonksEnhancedJournal = this;
 
 		MonksEnhancedJournal.SOCKET = "module.monks-enhanced-journal";
