@@ -1761,6 +1761,14 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             ui.journal.collection.toggleSortingMode();
             ui.journal.render();
         });
+        // Core's JournalDirectory owns this action for its own app; here nothing wires
+        // it up, so toggle the collection's search mode the same way core does and
+        // re-render so the placeholder/icon and search input (mode reset) refresh.
+        $('.toggle-search-mode', html).click((event) => {
+            event.preventDefault();
+            this.collection.toggleSearchMode();
+            this.render();
+        });
         $('.collapse-all', html).click(ui.journal.collapseAll.bind(this));
 
         // Intersection Observer
@@ -1785,6 +1793,34 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         this._searchFilters = [new foundry.applications.ux.SearchFilter({ inputSelector: 'input[name="search"]', contentSelector: ".directory-list", callback: ui.journal._onSearchFilter.bind(ui.journal) })];
         this._searchFilters.forEach(f => f.bind(html));
 
+        // Full-text ("deep") search: name mode is handled entirely by the SearchFilter
+        // above (live, per-keystroke). In full mode Enter triggers a scan across page
+        // text and MEJ flag fields and swaps the folder tree for a results panel;
+        // emptying the query (typing it out, or the input's native clear control, which
+        // both surface as an 'input' event with an empty value) restores the tree.
+        const searchInput = html.querySelector('input[name="search"]');
+        if (searchInput) {
+            searchInput.addEventListener('keydown', async (event) => {
+                if (event.key !== 'Enter') return;
+                // The search box lives inside this app's submitOnChange form: swallow
+                // Enter so an implicit form submission doesn't fire a document update.
+                event.preventDefault();
+                if (this.collection.searchMode === CONST.DIRECTORY_SEARCH_MODES.NAME) return;
+
+                const query = searchInput.value.trim();
+                if (!query) {
+                    this._restoreDirectoryTree(html);
+                    return;
+                }
+                const results = await this.deepSearch(query);
+                this._renderSearchResults(results, html);
+            });
+            searchInput.addEventListener('input', () => {
+                if (this.collection.searchMode === CONST.DIRECTORY_SEARCH_MODES.NAME) return;
+                if (!searchInput.value) this._restoreDirectoryTree(html);
+            });
+        }
+
         new foundry.applications.ux.DragDrop.implementation({
             dragSelector: ".directory-item",
             dropSelector: ".directory-list",
@@ -1802,6 +1838,126 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             folder.addEventListener("dragenter", ui.journal._onDragHighlight.bind(ui.journal));
             folder.addEventListener("dragleave", ui.journal._onDragHighlight.bind(ui.journal));
         });
+    }
+
+    // Full-text scan across journal entries and their MEJ flag fields (#42, #210).
+    // Only entries/pages the current user can at least observe are scanned; a
+    // per-attribute playerHidden setting (added by a sibling branch on top of this
+    // one - there's no such per-attribute setting on this base) is honoured for
+    // non-GMs via the `?.` chain below, which is inert here and correct there.
+    async deepSearch(query) {
+        const q = query.toLowerCase();
+        // MEJ's own sheets gate secrets on ownership, not mere observation
+        // (EnhancedJournalSheet.js/QuestSheet.js: `secrets: this.document.isOwner`,
+        // matching core TextEditor.enrichHTML's own `secrets` option, which - per
+        // its own doc comment - removes unrevealed `section.secret` blocks from the
+        // HTML entirely when false). An OBSERVER-only page must not leak secret
+        // text into a snippet just because it happens to contain the query.
+        const strip = (html, isOwner) => {
+            const d = document.createElement("div");
+            d.innerHTML = html || "";
+            if (!isOwner) d.querySelectorAll("section.secret").forEach((s) => s.remove());
+            return d.textContent || "";
+        };
+        const snippet = (text, label) => {
+            const i = text.toLowerCase().indexOf(q);
+            if (i < 0) return null;
+            const s = Math.max(0, i - 40), e = Math.min(text.length, i + q.length + 40);
+            return `${label ? label + ": " : ""}${s > 0 ? "…" : ""}${text.slice(s, e)}${e < text.length ? "…" : ""}`;
+        };
+        const types = MonksEnhancedJournal.getDocumentTypes();
+        let results = [];
+        for (let entry of game.journal) {
+            if (!entry.testUserPermission(game.user, "OBSERVER")) continue;
+            let matches = [];
+            for (let page of entry.pages) {
+                if (!page.testUserPermission(game.user, "OBSERVER")) continue;
+                const isPageOwner = page.isOwner;
+                let hit = snippet(page.name, null) || snippet(strip(page.text?.content, isPageOwner), null);
+                if (hit) matches.push(hit);
+
+                const flags = page.flags["monks-enhanced-journal"] || {};
+                let pageType = flags.type;
+                if (pageType == "base" || pageType == "oldentry") pageType = "journalentry";
+                const pageSettings = types[pageType]?.sheetSettings?.() || {};
+
+                for (let [k, v] of Object.entries(flags.attributes || {})) {
+                    if (!game.user.isGM && pageSettings.attributes?.[k]?.playerHidden) continue;
+                    let h = typeof v === "string" && snippet(v, k);
+                    if (h) matches.push(h);
+                }
+                for (let key of ["role", "location"])
+                    { let h = typeof flags[key] === "string" && snippet(flags[key], key); if (h) matches.push(h); }
+                for (let obj of Object.values(flags.objectives || {}))
+                    { let h = obj?.title && snippet(obj.title, "objective"); if (h) matches.push(h); }
+                for (let item of Object.values(flags.items || {}))
+                    { let h = item?.name && snippet(item.name, "item"); if (h) matches.push(h); }
+                let notes = typeof flags.notes === "string" ? snippet(strip(flags.notes, isPageOwner), "notes") : null;
+                if (notes) matches.push(notes);
+            }
+            let nameHit = snippet(entry.name, null);
+            if (nameHit) matches.unshift(nameHit);
+            if (matches.length) results.push({ entry, snippets: matches.slice(0, 3) });
+        }
+        return results;
+    }
+
+    // Swap the folder tree for a flat list of deep-search hits.
+    _renderSearchResults(results, html) {
+        const directoryList = html.querySelector(".directory-list");
+        let panel = html.querySelector(".mej-search-results");
+        if (!panel) {
+            panel = document.createElement("ol");
+            panel.classList.add("mej-search-results");
+            directoryList?.insertAdjacentElement("afterend", panel);
+        }
+        panel.replaceChildren();
+        if (directoryList) directoryList.style.display = "none";
+        panel.style.display = "";
+
+        if (!results.length) {
+            const li = document.createElement("li");
+            li.classList.add("mej-search-empty");
+            li.textContent = i18n("MonksEnhancedJournal.NoSearchResults");
+            panel.appendChild(li);
+            return;
+        }
+
+        for (let { entry, snippets } of results) {
+            const type = MonksEnhancedJournal.getMEJType(entry) || "journalentry";
+
+            const li = document.createElement("li");
+            li.classList.add("mej-search-result", "directory-item");
+            li.dataset.entryId = entry.id;
+
+            const name = document.createElement("div");
+            name.classList.add("mej-search-name");
+            const icon = document.createElement("i");
+            icon.className = `fas fa-fw ${MonksEnhancedJournal.getIcon(type)}`;
+            name.appendChild(icon);
+            name.append(entry.name);
+            li.appendChild(name);
+
+            for (let text of snippets) {
+                const snip = document.createElement("div");
+                snip.classList.add("mej-search-snippet");
+                snip.textContent = text;
+                li.appendChild(snip);
+            }
+
+            li.addEventListener("click", () => {
+                MonksEnhancedJournal.openJournalEntry(entry);
+            });
+
+            panel.appendChild(li);
+        }
+    }
+
+    // Discard the results panel and bring the folder tree back.
+    _restoreDirectoryTree(html) {
+        html.querySelector(".mej-search-results")?.remove();
+        const directoryList = html.querySelector(".directory-list");
+        if (directoryList) directoryList.style.display = "";
     }
 
     activateFooterListeners(html) {
