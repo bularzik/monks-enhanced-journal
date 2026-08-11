@@ -108,7 +108,7 @@ export class TransferCurrency extends HandlebarsApplicationMixin(ApplicationV2) 
     async _onSubmitForm(formConfig, event) {
         event.preventDefault();
 
-        let remainder = this.options.document.getFlag('monks-enhanced-journal', 'currency');
+        let remainder = this.options.document.getFlag('monks-enhanced-journal', 'currency') || {};
 
         for (let [k, v] of Object.entries(this.currency)) {
             if (v < 0) {
