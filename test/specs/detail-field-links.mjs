@@ -43,6 +43,7 @@
 import assert from 'node:assert/strict';
 import { withSession, createEntry, openEntry, setEntryFlag, dropOnSheet, assertNoErrors } from '../helpers/mej.js';
 
+const MODULE = 'monks-enhanced-journal';
 const LOCATION_SEL = 'input[name="flags.monks-enhanced-journal.location"]';
 const ROLE_SEL = 'input[name="flags.monks-enhanced-journal.role"]';
 const ANCESTRY_SEL = 'input[name="flags.monks-enhanced-journal.attributes.ancestry"]';
@@ -219,6 +220,47 @@ await withSession('detail-field-links', { users: ['Gamemaster', 'User 1'] }, asy
     const doc = game.MonksEnhancedJournal.journal?.document;
     return doc?.id === id || doc?.parent?.id === id;
   }, targetId, { timeout: 5000 });
+
+  // --- Organization attribute field also drops + enriches (Task 9 merge
+  // check): Organization/Event/POI (enh/more-type-attributes) gained
+  // fieldlist() via the hoist off Person/Place, but only Person/Place called
+  // enrichFields(this.fieldlist()) before this branch existed - the merge
+  // must have wired enrichFields() into the three new sheets too, or their
+  // attribute fields would drop @UUID[...] syntax but never render it as a
+  // clickable link. sheet-settings is world-scoped, so save/restore it
+  // around enabling the "leader" attribute + entry-details tab, mirroring
+  // more-type-attributes.mjs's own idempotency guard.
+  const originalSheetSettings = await gm.evaluate((mod) => game.settings.get(mod, 'sheet-settings'), MODULE);
+  try {
+    await gm.evaluate((mod) => {
+      const settings = foundry.utils.duplicate(game.settings.get(mod, 'sheet-settings') || {});
+      settings.organization = settings.organization || {};
+      settings.organization.attributes = settings.organization.attributes || {};
+      settings.organization.attributes.leader = { ...(settings.organization.attributes.leader || {}), shown: true };
+      settings.organization.tabs = settings.organization.tabs || {};
+      settings.organization.tabs['entry-details'] = { ...(settings.organization.tabs['entry-details'] || {}), shown: true };
+      return game.settings.set(mod, 'sheet-settings', settings, { diff: false });
+    }, MODULE);
+
+    const orgId = await createEntry(gm, 'organization', 'TT-org-field-link');
+    await openEntry(gm, orgId);
+    await gm.click('.monks-enhanced-journal a[data-tab="entry-details"]');
+    const LEADER_SEL = 'input[name="flags.monks-enhanced-journal.attributes.leader"]';
+    await gm.waitForSelector(LEADER_SEL, { state: 'attached' });
+    await dropOnSheet(gm, LEADER_SEL, { type: 'JournalEntry', uuid: targetUuid });
+    const leaderDropped = await gm.evaluate((sel) => document.querySelector(sel)?.value, LEADER_SEL);
+    assert.equal(leaderDropped, `@UUID[${targetUuid}]{TT-link-target}`, 'Organization detail-field drop did not insert @UUID[...] syntax');
+
+    await gm.click('.monks-enhanced-journal a[data-tab="entry-details"]');
+    await gm.waitForSelector('.mej-field-display[data-field="leader"] a.content-link', { state: 'attached' });
+    const orgLinkUuid = await gm.evaluate(() =>
+      document.querySelector('.mej-field-display[data-field="leader"] a.content-link')?.dataset.uuid);
+    assert.equal(orgLinkUuid, targetUuid,
+      'Organization attribute field did not enrich its dropped link - enrichFields() must be wired through the hoisted fieldlist() for the new types too');
+  } finally {
+    await gm.evaluate((args) => game.settings.set(args.mod, 'sheet-settings', args.orig, { diff: false }),
+      { mod: MODULE, orig: originalSheetSettings });
+  }
 
   assertNoErrors(session);
 });
