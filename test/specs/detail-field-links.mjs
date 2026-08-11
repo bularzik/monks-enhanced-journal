@@ -72,9 +72,13 @@ await withSession('detail-field-links', { users: ['Gamemaster', 'User 1'] }, asy
     const doc = game.MonksEnhancedJournal.journal?.document;
     return doc?.id === id || doc?.parent?.id === id;
   }, targetId, { timeout: 5000 });
-  const openAppCount = await gm.evaluate(() =>
-    Object.values(ui.windows).filter((w) => w.rendered && w.document?.documentName === 'JournalEntry').length);
-  assert.equal(openAppCount, 0, 'clicking the content-link should route through MEJ, not also pop a default core JournalEntry sheet');
+  // ui.windows is the (empty, for ApplicationV2) legacy registry;
+  // foundry.applications.instances is what actually tracks rendered V2 apps.
+  const strayJournalSheets = await gm.evaluate(() =>
+    [...foundry.applications.instances.values()]
+      .filter((w) => w.rendered && w.document?.documentName === 'JournalEntry' && w.constructor.name !== 'EnhancedJournal')
+      .map((w) => w.constructor.name));
+  assert.deepEqual(strayJournalSheets, [], 'clicking the content-link should route through MEJ, not also pop a default core JournalEntry sheet');
 
   // --- Double-click swaps back to the raw input containing the @UUID syntax ---
   // Navigate back to the person entry (the click above moved the MEJ browser
