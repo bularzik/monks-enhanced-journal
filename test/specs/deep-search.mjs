@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict';
 import { withSession, createEntry, openEntry, setEntryFlag, assertNoErrors } from '../helpers/mej.js';
 
+const MODULE = 'monks-enhanced-journal';
 const MARKER = 'xyzqmarker';
 const SEARCH_INPUT = '.directory-sidebar input[name="search"]';
 const RESULTS = '.directory-sidebar .mej-search-results';
@@ -214,6 +215,67 @@ await withSession('deep-search', { users: ['Gamemaster', 'User 1'] }, async (ses
   assert.ok(playerOuterRows[0].snippets.some((s) => s.includes(OUTER_MARKER)));
   await p1.fill(SEARCH_INPUT, '');
   await p1.waitForSelector(RESULTS, { state: 'detached', timeout: 15_000 });
+
+  // --- playerHidden attribute guard (Task 9 merge check) ------------------
+  // deepSearch's `!game.user.isGM && pageSettings.attributes?.[k]?.playerHidden`
+  // guard (apps/enhanced-journal.js) was written defensively against a
+  // per-attribute playerHidden setting that didn't exist on this branch's own
+  // base - it goes live once merged with enh/attribute-visibility (already on
+  // enhancements-test) + enh/more-type-attributes. A GM-only attribute must
+  // not surface a player's search hit, while a visible attribute on the very
+  // same page still does. sheet-settings is world-scoped: save/restore it
+  // around marking "race" playerHidden, mirroring more-type-attributes.mjs.
+  const HIDDEN_MARKER = 'zzzhiddenattrmarker';
+  const VISIBLE_MARKER = 'zzzvisibleattrmarker';
+  const originalSheetSettings = await gm.evaluate((mod) => game.settings.get(mod, 'sheet-settings'), MODULE);
+  try {
+    await gm.evaluate((mod) => {
+      const settings = foundry.utils.duplicate(game.settings.get(mod, 'sheet-settings') || {});
+      settings.person = settings.person || {};
+      settings.person.attributes = settings.person.attributes || {};
+      settings.person.attributes.race = { ...(settings.person.attributes.race || {}), playerHidden: true };
+      return game.settings.set(mod, 'sheet-settings', settings, { diff: false });
+    }, MODULE);
+
+    const hiddenAttrEntryId = await createEntry(gm, 'person', 'TT-deep-search-hidden-attr');
+    await setEntryFlag(gm, hiddenAttrEntryId, 'attributes', { race: HIDDEN_MARKER, ancestry: VISIBLE_MARKER });
+
+    // GM: not subject to the playerHidden guard, finds the hidden attribute.
+    await gm.fill(SEARCH_INPUT, HIDDEN_MARKER);
+    await gm.press(SEARCH_INPUT, 'Enter');
+    await gm.waitForSelector(RESULTS, { state: 'visible', timeout: 15_000 });
+    const gmHiddenRows = await readResults(gm);
+    assert.equal(gmHiddenRows.length, 1, `GM should find the playerHidden attribute, got ${JSON.stringify(gmHiddenRows)}`);
+    assert.ok(gmHiddenRows[0].snippets.some((s) => s.startsWith('race:') && s.includes(HIDDEN_MARKER)));
+    await gm.fill(SEARCH_INPUT, '');
+    await gm.waitForSelector(RESULTS, { state: 'detached', timeout: 15_000 });
+
+    // Player: the playerHidden "race" attribute must not surface a hit...
+    await p1.fill(SEARCH_INPUT, HIDDEN_MARKER);
+    await p1.press(SEARCH_INPUT, 'Enter');
+    await p1.waitForSelector(RESULTS, { state: 'visible', timeout: 15_000 });
+    const playerHiddenRows = await readResults(p1);
+    assert.equal(playerHiddenRows.length, 0,
+      `player must not find a marker that only exists in a playerHidden attribute, got ${JSON.stringify(playerHiddenRows)}`);
+    await p1.fill(SEARCH_INPUT, '');
+    await p1.waitForSelector(RESULTS, { state: 'detached', timeout: 15_000 });
+
+    // ...but a visible attribute on the very same page still hits, proving
+    // the guard excludes only the one hidden attribute, not the whole page.
+    await p1.fill(SEARCH_INPUT, VISIBLE_MARKER);
+    await p1.press(SEARCH_INPUT, 'Enter');
+    await p1.waitForSelector(RESULTS, { state: 'visible', timeout: 15_000 });
+    const playerVisibleRows = await readResults(p1);
+    assert.equal(playerVisibleRows.length, 1,
+      `player should still find the visible attribute on the same page, got ${JSON.stringify(playerVisibleRows)}`);
+    assert.equal(playerVisibleRows[0].name, 'TT-deep-search-hidden-attr');
+    assert.ok(playerVisibleRows[0].snippets.some((s) => s.startsWith('ancestry:') && s.includes(VISIBLE_MARKER)));
+    await p1.fill(SEARCH_INPUT, '');
+    await p1.waitForSelector(RESULTS, { state: 'detached', timeout: 15_000 });
+  } finally {
+    await gm.evaluate((args) => game.settings.set(args.mod, 'sheet-settings', args.orig, { diff: false }),
+      { mod: MODULE, orig: originalSheetSettings });
+  }
 
   assertNoErrors(session);
 });
