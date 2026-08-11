@@ -158,11 +158,11 @@ export class ShopSheet extends EnhancedJournalSheet {
             relationships: Object.keys(context.relationships || {})?.length > 0
         }
 
-        context.fields = [
+        context.fields = await this.enrichFields([
             { id: 'shoptype', label: "MonksEnhancedJournal.ShopType", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.shoptype") },
             { id: 'location', label: "MonksEnhancedJournal.Location", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.location") },
             { label: "MonksEnhancedJournal.HoursOfOperation", value: `${context.hours} ${context.open ? i18n('MonksEnhancedJournal.Open') : i18n('MonksEnhancedJournal.Closed')}` }
-        ]
+        ])
         context.placeholder = "MonksEnhancedJournal.ShopName";
 
         context.hasShowToPlayers = true;

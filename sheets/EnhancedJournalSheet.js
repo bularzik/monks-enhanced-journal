@@ -603,7 +603,11 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         }
         if (anchor.dataset.pack) {
             let id = anchor.dataset.id ?? anchor.dataset.lookup;
-            let doc = id ? await game.packs.get(anchor.dataset.pack)?.getDocument(id) : null;
+            // Runs inside the click's setTimeout, well after the anchor was
+            // rendered - the pack reference (or the compendium entry itself)
+            // can go stale in the meantime. getDocument() rejecting there
+            // would otherwise raise an unhandled promise rejection.
+            let doc = id ? await game.packs.get(anchor.dataset.pack)?.getDocument(id).catch(() => null) : null;
             if (doc)
                 return doc;
         }

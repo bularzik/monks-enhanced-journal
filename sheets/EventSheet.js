@@ -60,10 +60,10 @@ export class EventSheet extends EnhancedJournalSheet {
             relationships: Object.keys(context.relationships || {})?.length > 0
         }
 
-        context.fields = [
+        context.fields = await this.enrichFields([
             { id: 'location', label: "MonksEnhancedJournal.Location", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.location") },
             { id: 'date', label: "MonksEnhancedJournal.Date", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.date") }
-        ]
+        ])
         context.placeholder = "MonksEnhancedJournal.Event";
 
         return context;
