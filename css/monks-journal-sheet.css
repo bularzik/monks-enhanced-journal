@@ -518,6 +518,14 @@ body:not(.system-pf2e) .monks-journal-sheet .sheet-container .tag {
     white-space: nowrap;
 }
 
+.monks-journal-sheet.sheet .mej-field-display a.content-link.broken {
+    /* Unresolvable reference: no clickable/navigable affordance on the link
+       itself - the wrapping display div's own dblclick-to-edit cursor still
+       applies since a broken reference is still fixable via editing. */
+    cursor: default;
+    pointer-events: none;
+}
+
 /* Document Details */
 .monks-journal-sheet.sheet .document-details {
     border-radius: 5px;

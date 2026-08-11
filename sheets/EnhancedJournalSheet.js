@@ -540,14 +540,18 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     // _onFieldDisplayDblClick swap to edit mode instead. A lone click still
     // opens the link, just after the disambiguation window - by calling the
     // document's own `_onClickDocumentLink` (the same delegate MEJ already
-    // patches for its normal content-link routing, e.g. openJournalEntry),
-    // not a new router. A direct call is used rather than re-dispatching a
-    // synthetic click because Foundry's global content-link listener ignores
-    // untrusted (script-dispatched) events.
+    // patches for JournalEntry/JournalEntryPage/Actor routing, and the base
+    // Foundry implementation everything else - Macro, PlaylistSound, Item,
+    // ... - already has), not a new router or hand-rolled type dispatch. A
+    // direct call is used rather than re-dispatching a synthetic click
+    // because Foundry's global content-link listener ignores untrusted
+    // (script-dispatched) events.
     async _onFieldDisplayClick(event) {
         let anchor = event.target.closest("a.content-link, a[data-link]");
         if (!anchor)
             return;
+        if (anchor.classList.contains("broken"))
+            return; // unresolvable reference - stays inert, no action at all
 
         let display = event.currentTarget;
         event.preventDefault();
@@ -564,12 +568,34 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         let { altKey, ctrlKey, metaKey, shiftKey } = event;
         display._mejLinkClickTimer = setTimeout(async () => {
             display._mejLinkClickTimer = null;
-            let doc = anchor.dataset.uuid ? await fromUuid(anchor.dataset.uuid) : null;
-            if (!doc && anchor.dataset.type && anchor.dataset.id)
-                doc = game.collections.get(anchor.dataset.type)?.get(anchor.dataset.id);
+            let doc = await EnhancedJournalSheet._resolveContentLinkDocument(anchor);
             if (doc?._onClickDocumentLink)
                 doc._onClickDocumentLink({ target: anchor, altKey, ctrlKey, metaKey, shiftKey, preventDefault: () => { } });
         }, 300);
+    }
+
+    // Resolves whatever document the enricher's own dataset attributes point
+    // at - data-uuid covers everything TextEditor.enrichHTML produces for
+    // current-syntax @UUID[...] references (world docs, compendium docs via
+    // their full Compendium.* uuid, embedded docs like PlaylistSound); the
+    // pack/type fallbacks only matter for older syntaxes that don't resolve
+    // to a full uuid. This only identifies the document - it doesn't decide
+    // what clicking it should do, that's left to _onClickDocumentLink.
+    static async _resolveContentLinkDocument(anchor) {
+        if (anchor.dataset.uuid) {
+            let doc = await fromUuid(anchor.dataset.uuid);
+            if (doc)
+                return doc;
+        }
+        if (anchor.dataset.pack) {
+            let id = anchor.dataset.id ?? anchor.dataset.lookup;
+            let doc = id ? await game.packs.get(anchor.dataset.pack)?.getDocument(id) : null;
+            if (doc)
+                return doc;
+        }
+        if (anchor.dataset.type && anchor.dataset.id)
+            return game.collections.get(anchor.dataset.type)?.get(anchor.dataset.id) ?? null;
+        return null;
     }
 
     _onFieldDisplayDblClick(event) {
