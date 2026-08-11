@@ -16,6 +16,16 @@ The harness boots Foundry itself if it's down (`~/FoundryVTT-14/start-foundry.co
 and activates `world-a` if another world is live. First-time setup:
 `npm install && npx playwright install chromium`.
 
+**Ordering note:** `run.mjs` runs specs alphabetically in one Node process.
+`zz-currency-systems.mjs` switches the live server through two other worlds
+and back (see its own header comment) - it's prefixed `zz-` specifically so
+it sorts and runs *last*, after every other spec, rather than immediately
+before whichever spec would otherwise follow it alphabetically (this used to
+land right before `deep-search.mjs`, and its world-switch-then-restore
+occasionally raced that spec's session connect - a pre-existing test-infra
+flake, not a product bug). Keep it named so it sorts last if you ever rename
+it. `node run.mjs currency-systems` (a substring match) still finds it.
+
 ## Writing a throwaway check (fix sessions)
 
 Put it in `scratch/` (gitignored). Template:
@@ -162,7 +172,7 @@ currency (cited above), the ruling was to validate both systems against it as
 configured (`currency-attribute` left **blank** for Mythras — that setting is
 irrelevant there, the hardcoded branch bypasses `currencyname()` entirely) and
 treat any failure *inside* that pre-existing branch as a documented, not-fixed
-outcome. `test/specs/currency-systems.mjs` does this, parameterized over both
+outcome. `test/specs/zz-currency-systems.mjs` does this, parameterized over both
 worlds:
 
 - **Symbaroum**: `price-attribute: "cost"`, `quantity-attribute: "number"`,

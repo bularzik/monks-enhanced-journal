@@ -262,5 +262,32 @@ await withSession('detail-field-links', { users: ['Gamemaster', 'User 1'] }, asy
       { mod: MODULE, orig: originalSheetSettings });
   }
 
+  // --- final-review I1: header detail fields (context.fields,
+  // sheet-detailed-header.hbs) enrich on a non-Person type too -----------
+  // The drop handler is base-class-wide (EnhancedJournalSheet.js) and the
+  // header partial already supports `field.enriched`, but before this fix
+  // only PersonSheet/PlaceSheet wrapped their `context.fields` in
+  // `await this.enrichFields([...])` - Event/Organization/POI/Shop/Quest's
+  // header fields built the same shape but never enriched it, so a dropped
+  // @UUID[...] rendered as dead raw syntax instead of a clickable link.
+  // Event's "location" header field shares the exact same flag path/id as
+  // Person's ("location" -> flags.monks-enhanced-journal.location) and, as a
+  // header field (not a detail/attribute field), needs no entry-details tab
+  // or sheet-settings toggle to reach.
+  {
+    const eventId = await createEntry(gm, 'event', 'TT-event-field-link');
+    await openEntry(gm, eventId);
+    await gm.waitForSelector(LOCATION_SEL, { state: 'attached' });
+    await dropOnSheet(gm, LOCATION_SEL, { type: 'JournalEntry', uuid: targetUuid });
+    const eventLocationDropped = await gm.evaluate((sel) => document.querySelector(sel)?.value, LOCATION_SEL);
+    assert.equal(eventLocationDropped, `@UUID[${targetUuid}]{TT-link-target}`, 'Event header field drop did not insert @UUID[...] syntax');
+
+    await gm.waitForSelector('.mej-field-display[data-field="location"] a.content-link', { state: 'attached' });
+    const eventLinkUuid = await gm.evaluate(() =>
+      document.querySelector('.mej-field-display[data-field="location"] a.content-link')?.dataset.uuid);
+    assert.equal(eventLinkUuid, targetUuid,
+      'Event header field did not enrich its dropped link - context.fields must be wrapped in enrichFields() on every type, not just Person/Place');
+  }
+
   assertNoErrors(session);
 });
