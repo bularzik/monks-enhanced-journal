@@ -68,7 +68,7 @@ export class OrganizationSheet extends EnhancedJournalSheet {
         }
         context.canViewActor = !!context.actor;
 
-        context.detailFields = this.fieldlist();
+        context.detailFields = await this.enrichFields(this.fieldlist());
 
         context.offerings = this.getOfferings();
 

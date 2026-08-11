@@ -54,7 +54,7 @@ export class EventSheet extends EnhancedJournalSheet {
 
         context.relationships = await this.getRelationships();
 
-        context.detailFields = this.fieldlist();
+        context.detailFields = await this.enrichFields(this.fieldlist());
 
         context.has = {
             relationships: Object.keys(context.relationships || {})?.length > 0
