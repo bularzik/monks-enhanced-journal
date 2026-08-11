@@ -1847,7 +1847,18 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     // non-GMs via the `?.` chain below, which is inert here and correct there.
     async deepSearch(query) {
         const q = query.toLowerCase();
-        const strip = (html) => { const d = document.createElement("div"); d.innerHTML = html || ""; return d.textContent || ""; };
+        // MEJ's own sheets gate secrets on ownership, not mere observation
+        // (EnhancedJournalSheet.js/QuestSheet.js: `secrets: this.document.isOwner`,
+        // matching core TextEditor.enrichHTML's own `secrets` option, which - per
+        // its own doc comment - removes unrevealed `section.secret` blocks from the
+        // HTML entirely when false). An OBSERVER-only page must not leak secret
+        // text into a snippet just because it happens to contain the query.
+        const strip = (html, isOwner) => {
+            const d = document.createElement("div");
+            d.innerHTML = html || "";
+            if (!isOwner) d.querySelectorAll("section.secret").forEach((s) => s.remove());
+            return d.textContent || "";
+        };
         const snippet = (text, label) => {
             const i = text.toLowerCase().indexOf(q);
             if (i < 0) return null;
@@ -1861,7 +1872,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             let matches = [];
             for (let page of entry.pages) {
                 if (!page.testUserPermission(game.user, "OBSERVER")) continue;
-                let hit = snippet(page.name, null) || snippet(strip(page.text?.content), null);
+                const isPageOwner = page.isOwner;
+                let hit = snippet(page.name, null) || snippet(strip(page.text?.content, isPageOwner), null);
                 if (hit) matches.push(hit);
 
                 const flags = page.flags["monks-enhanced-journal"] || {};
@@ -1880,7 +1892,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                     { let h = obj?.title && snippet(obj.title, "objective"); if (h) matches.push(h); }
                 for (let item of Object.values(flags.items || {}))
                     { let h = item?.name && snippet(item.name, "item"); if (h) matches.push(h); }
-                let notes = typeof flags.notes === "string" ? snippet(strip(flags.notes), "notes") : null;
+                let notes = typeof flags.notes === "string" ? snippet(strip(flags.notes, isPageOwner), "notes") : null;
                 if (notes) matches.push(notes);
             }
             let nameHit = snippet(entry.name, null);
