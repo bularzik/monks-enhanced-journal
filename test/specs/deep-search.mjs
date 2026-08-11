@@ -153,5 +153,67 @@ await withSession('deep-search', { users: ['Gamemaster', 'User 1'] }, async (ses
   assert.ok(!playerRows.some((r) => r.name === 'TT-deep-search-quest'),
     'player must not see the quest they have no permission on');
 
+  // --- Secret-section content must not leak to non-owner observers --------
+  // MEJ's own sheets gate secrets on isOwner, not OBSERVER
+  // (EnhancedJournalSheet.js/QuestSheet.js: `secrets: this.document.isOwner`).
+  // An OBSERVER-only player must not get a word from inside
+  // <section class="secret"> back in a labeled snippet just because
+  // deepSearch happened to scan the raw page text.
+  const SECRET_MARKER = 'zzzsecretmarker';
+  const OUTER_MARKER = 'zzzoutermarker';
+  const secretEntryId = await gm.evaluate(async ({ secret, outer }) => {
+    const entry = await JournalEntry.create({
+      name: 'TT-deep-search-secret',
+      ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
+      pages: [{
+        name: 'TT-deep-search-secret',
+        type: 'text',
+        text: {
+          content: `<p>Public info mentions the ${outer}.</p>`
+            + `<section class="secret"><p>GM-only detail: ${secret}</p></section>`,
+        },
+      }],
+    });
+    return entry.id;
+  }, { secret: SECRET_MARKER, outer: OUTER_MARKER });
+
+  // GM is the owner of everything: finds the marker that only lives inside
+  // the secret section.
+  await gm.fill(SEARCH_INPUT, SECRET_MARKER);
+  await gm.press(SEARCH_INPUT, 'Enter');
+  await gm.waitForSelector(RESULTS, { state: 'visible', timeout: 15_000 });
+  const gmSecretRows = await readResults(gm);
+  assert.equal(gmSecretRows.length, 1,
+    `GM should find the secret-only marker, got ${JSON.stringify(gmSecretRows)}`);
+  assert.equal(gmSecretRows[0].id, secretEntryId);
+  assert.equal(gmSecretRows[0].name, 'TT-deep-search-secret');
+  assert.ok(gmSecretRows[0].snippets.some((s) => s.includes(SECRET_MARKER)));
+  await gm.fill(SEARCH_INPUT, '');
+  await gm.waitForSelector(RESULTS, { state: 'detached', timeout: 15_000 });
+
+  // Player has OBSERVER (not OWNER) on this entry: must NOT find a marker
+  // that exists only inside the secret section.
+  await p1.fill(SEARCH_INPUT, SECRET_MARKER);
+  await p1.press(SEARCH_INPUT, 'Enter');
+  await p1.waitForSelector(RESULTS, { state: 'visible', timeout: 15_000 });
+  const playerSecretRows = await readResults(p1);
+  assert.equal(playerSecretRows.length, 0,
+    `player must not find a marker that only exists inside a secret section, got ${JSON.stringify(playerSecretRows)}`);
+  await p1.fill(SEARCH_INPUT, '');
+  await p1.waitForSelector(RESULTS, { state: 'detached', timeout: 15_000 });
+
+  // Same page, same player: a marker outside the secret section still hits -
+  // proves the secret *section* was stripped, not the whole page excluded.
+  await p1.fill(SEARCH_INPUT, OUTER_MARKER);
+  await p1.press(SEARCH_INPUT, 'Enter');
+  await p1.waitForSelector(RESULTS, { state: 'visible', timeout: 15_000 });
+  const playerOuterRows = await readResults(p1);
+  assert.equal(playerOuterRows.length, 1,
+    `player should still find the non-secret marker on the same page, got ${JSON.stringify(playerOuterRows)}`);
+  assert.equal(playerOuterRows[0].name, 'TT-deep-search-secret');
+  assert.ok(playerOuterRows[0].snippets.some((s) => s.includes(OUTER_MARKER)));
+  await p1.fill(SEARCH_INPUT, '');
+  await p1.waitForSelector(RESULTS, { state: 'detached', timeout: 15_000 });
+
   assertNoErrors(session);
 });
