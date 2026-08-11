@@ -174,24 +174,6 @@ export class PlaceSheet extends EnhancedJournalSheet {
         return context;
     }
 
-    fieldlist() {
-        let settings = this.sheetSettings() || {};
-        let fields = MonksEnhancedJournal.convertObjectToArray(settings?.attributes);
-        let attributes = this.document.flags['monks-enhanced-journal'].attributes || {};
-        return fields
-            .filter(f => f.shown && (game.user.isGM || !f.playerHidden))
-            .map(f => {
-                let attr = attributes[f.id];
-                return {
-                    id: f.id,
-                    name: f.name,
-                    value: attr,
-                    full: f.full,
-                    playerHidden: !!f.playerHidden && game.user.isGM
-                }
-            });
-    }
-
     _documentControls() {
         let ctrls = [
             { label: '<i class="fas fa-search"></i>', type: 'text' },

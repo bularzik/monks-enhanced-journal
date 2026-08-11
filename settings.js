@@ -536,17 +536,31 @@ export const registerSettings = function () {
 			event: {
 				tabs: {
 					'description': { name: 'MonksEnhancedJournal.Description', shown: true },
+					'entry-details': { name: 'MonksEnhancedJournal.Details', shown: false },
 					'relationships': { name: 'MonksEnhancedJournal.Relationships', shown: true },
 					'notes': { name: 'MonksEnhancedJournal.Notes', shown: true },
 				},
+				attributes: {
+					'date': { name: "MonksEnhancedJournal.Date", order: 0, shown: false, full: false },
+					'duration': { name: "MonksEnhancedJournal.EventDuration", order: 1, shown: false, full: false },
+					'outcome': { name: "MonksEnhancedJournal.Outcome", order: 2, shown: false, full: true }
+				}
 			},
 			organization: {
 				tabs: {
 					'description': { name: 'MonksEnhancedJournal.Description', shown: true },
+					'entry-details': { name: 'MonksEnhancedJournal.Details', shown: false },
 					'relationships': { name: 'MonksEnhancedJournal.Relationships', shown: true },
 					'offerings': { name: 'MonksEnhancedJournal.Offerings', shown: true },
 					'notes': { name: 'MonksEnhancedJournal.Notes', shown: true },
 				},
+				attributes: {
+					'leader': { name: "MonksEnhancedJournal.Leader", order: 0, shown: false, full: false },
+					'headquarters': { name: "MonksEnhancedJournal.Headquarters", order: 1, shown: false, full: false },
+					'scope': { name: "MonksEnhancedJournal.Scope", order: 2, shown: false, full: false },
+					'alignment': { name: "MonksEnhancedJournal.Alignment", order: 3, shown: false, full: false },
+					'founded': { name: "MonksEnhancedJournal.Founded", order: 4, shown: false, full: false }
+				}
 			},
 			person: {
 				tabs: {
@@ -609,9 +623,15 @@ export const registerSettings = function () {
 			poi: {
 				tabs: {
 					'description': { name: 'MonksEnhancedJournal.Description', shown: true },
+					'entry-details': { name: 'MonksEnhancedJournal.Details', shown: false },
 					'relationships': { name: 'MonksEnhancedJournal.Relationships', shown: true },
 					'notes': { name: 'MonksEnhancedJournal.Notes', shown: true },
 				},
+				attributes: {
+					'region': { name: "MonksEnhancedJournal.Region", order: 0, shown: false, full: false },
+					'terrain': { name: "MonksEnhancedJournal.Terrain", order: 1, shown: false, full: false },
+					'discovered': { name: "MonksEnhancedJournal.Discovered", order: 2, shown: false, full: false }
+				}
 			},
 			quest: {
 				tabs: {

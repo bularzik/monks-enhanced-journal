@@ -6,6 +6,11 @@
             <div class="tab{{#if subtabs.description.active}} active{{/if}}" data-group="primary" data-tab="description">
                 {{> "modules/monks-enhanced-journal/templates/sheets/partials/sheet-textentry.hbs"}}
             </div>
+            <div class="tab{{#if subtabs.entry-details.active}} active{{/if}}" data-group="primary" data-tab="entry-details">
+                <div class="tab-inner flexcol">
+                    {{> "modules/monks-enhanced-journal/templates/sheets/partials/sheet-details.hbs"}}
+                </div>
+            </div>
             <div class="tab{{#if subtabs.relationships.active}} active{{/if}}" data-group="primary" data-tab="relationships">
                 <div class="tab-inner flexcol">
                     {{> "modules/monks-enhanced-journal/templates/sheets/partials/sheet-relationships.hbs" groups=relationships hasRelationship=has.relationships}}
