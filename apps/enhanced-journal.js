@@ -1879,19 +1879,47 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                 const flags = page.flags["monks-enhanced-journal"] || {};
                 let pageType = flags.type;
                 if (pageType == "base" || pageType == "oldentry") pageType = "journalentry";
-                const pageSettings = types[pageType]?.sheetSettings?.() || {};
+                // Page-level sheet-settings (a per-document override, e.g. a GM flipping
+                // playerHidden on just this one page) aren't captured by the static
+                // class-level default alone - the sheet itself resolves this via its
+                // instance sheetSettings(), which merges the two
+                // (EnhancedJournalSheet.js's sheetSettings() over the static default).
+                // Mirror that merge here so a page-level override isn't silently ignored.
+                const pageSettings = foundry.utils.mergeObject(types[pageType]?.sheetSettings?.() || {}, flags["sheet-settings"] || {});
+                const isNonOwner = !game.user.isGM && !isPageOwner;
 
                 for (let [k, v] of Object.entries(flags.attributes || {})) {
-                    if (!game.user.isGM && pageSettings.attributes?.[k]?.playerHidden) continue;
+                    if (isNonOwner && pageSettings.attributes?.[k]?.playerHidden) continue;
                     let h = typeof v === "string" && snippet(v, k);
                     if (h) matches.push(h);
                 }
                 for (let key of ["role", "location"])
                     { let h = typeof flags[key] === "string" && snippet(flags[key], key); if (h) matches.push(h); }
-                for (let obj of Object.values(flags.objectives || {}))
-                    { let h = obj?.title && snippet(obj.title, "objective"); if (h) matches.push(h); }
-                for (let item of Object.values(flags.items || {}))
-                    { let h = item?.name && snippet(item.name, "item"); if (h) matches.push(h); }
+                // QuestSheet only shows an objective to non-owners once it's `available`
+                // (sheets/QuestSheet.js: `this.document.isOwner || o.available`) - an
+                // unavailable objective's title must not leak into a player's results.
+                for (let obj of Object.values(flags.objectives || {})) {
+                    if (isNonOwner && !obj?.available) continue;
+                    let h = obj?.title && snippet(obj.title, "objective");
+                    if (h) matches.push(h);
+                }
+                // Shop items: mirror EnhancedJournalSheet.js's getItemGroups() gate -
+                // hidden items are invisible to non-owners (`item.hidden !== true` in the
+                // sheet's own display condition), and ShopSheet.js's `hideitems` hides the
+                // ENTIRE item list to non-owners while the shop is closed. Unidentified
+                // items must be matched against their unidentified display name (what a
+                // player actually sees), not the real one - MonksEnhancedJournal.getItemDetails()
+                // is the same helper the sheet itself uses for that substitution.
+                const isShopClosed = pageType == "shop" && MonksEnhancedJournal.getOpenState(page) == "closed";
+                if (!(isNonOwner && isShopClosed)) {
+                    for (let item of Object.values(flags.items || {})) {
+                        if (!item) continue;
+                        if (isNonOwner && item.hidden === true) continue;
+                        let name = isNonOwner ? MonksEnhancedJournal.getItemDetails(item).name : item.name;
+                        let h = name && snippet(name, "item");
+                        if (h) matches.push(h);
+                    }
+                }
                 let notes = typeof flags.notes === "string" ? snippet(strip(flags.notes, isPageOwner), "notes") : null;
                 if (notes) matches.push(notes);
             }
@@ -1945,8 +1973,19 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                 li.appendChild(snip);
             }
 
-            li.addEventListener("click", () => {
-                MonksEnhancedJournal.openJournalEntry(entry);
+            li.addEventListener("click", async (event) => {
+                // openJournalEntry declines (returns false) for documents it doesn't
+                // handle itself - e.g. a plain-text journal entry with `mej-only-types`
+                // enabled (monks-enhanced-journal.js:2412) - so a bare call can silently
+                // no-op. Mirror the codebase's standard fallback pattern used at every
+                // other openJournalEntry call site (e.g. monks-enhanced-journal.js:764):
+                // fall back to the document's own core sheet when MEJ declines to open it.
+                // (This branch predates enh/open-behavior's altOpensOutside() helper, so
+                // event.altKey is used directly here, matching what that call site itself
+                // used before altOpensOutside existed.)
+                if (event.altKey || setting('open-outside') || !await MonksEnhancedJournal.openJournalEntry(entry)) {
+                    entry.sheet.render(true);
+                }
             });
 
             panel.appendChild(li);
