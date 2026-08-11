@@ -233,6 +233,12 @@ export class QuestSheet extends EnhancedJournalSheet {
                 { id: 'display', label: "MonksEnhancedJournal.DisplayInNotifications", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.display"), type: 'checkbox' }
             ]);
         }
+        // enrichFields() only touches string values (a regex test against the raw
+        // @UUID[...] syntax) and otherwise just stamps `.enriched = null` - the
+        // 'status'/'display' rows above keep their non-string-relevant `type`/`list`
+        // properties untouched and their `value` (a plain status key / boolean)
+        // never matches the enrich pattern, so they pass through unmangled.
+        context.fields = await this.enrichFields(context.fields);
         context.placeholder = "MonksEnhancedJournal.QuestName";
 
         context.hasShowToPlayers = true;

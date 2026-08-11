@@ -73,10 +73,10 @@ export class OrganizationSheet extends EnhancedJournalSheet {
             offerings: context.offerings?.length > 0
         }
 
-        context.fields = [
+        context.fields = await this.enrichFields([
             { id: 'alignment', label: "MonksEnhancedJournal.Alignment", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.alignment") },
             { id: 'location', label: "MonksEnhancedJournal.Location", value: foundry.utils.getProperty(context.data, "flags.monks-enhanced-journal.location") }
-        ]
+        ])
         context.placeholder = "MonksEnhancedJournal.Organization";
 
         return context;
