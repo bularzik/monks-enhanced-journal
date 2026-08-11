@@ -890,7 +890,11 @@ export class ShopSheet extends EnhancedJournalSheet {
                 delete formData.adjustment[k];
         }
 
-        let settingDefaults = setting("adjustment-defaults") || {};
+        // Source world/type defaults from the same place the live buy/sell flow resolves
+        // against (sheetSettings().adjustment -> sheet-settings.<type>.adjustment, already
+        // folding in this document's own saved override), not the orphaned
+        // "adjustment-defaults" setting the world-defaults Adjust Prices menu never writes to.
+        let settingDefaults = foundry.utils.duplicate(this.sheetSettings()?.adjustment || {});
         let adjustment = foundry.utils.mergeObject(settingDefaults, formData.adjustment || {});
 
         let items = this.document.getFlag('monks-enhanced-journal', 'items') || {};

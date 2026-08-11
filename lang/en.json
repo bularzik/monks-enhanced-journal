@@ -86,6 +86,8 @@
   "MonksEnhancedJournal.defaultprices.hint": "Default prices for shops",
   "MonksEnhancedJournal.customise-pages.name": "Customise Pages",
   "MonksEnhancedJournal.customise-pages.hint": "Customise the pages that are shown in the journal",
+  "MonksEnhancedJournal.adjustprices.name": "Adjust Prices (World Defaults)",
+  "MonksEnhancedJournal.adjustprices.hint": "Set the default buy and sell rates and price tiers used by shops that don't override them",
   "MonksEnhancedJournal.use-generic-price.name": "Use Original Price",
   "MonksEnhancedJournal.use-generic-price.hint": "After purchasing, set price of purchased item back to the original non-adjusted price.  I would not recommend this.  USE AT YOUR OWN RISK!",
   "MonksEnhancedJournal.loot-auto-distribute.name": "Auto Distribute Loot",

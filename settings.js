@@ -1,6 +1,7 @@
 import { MonksEnhancedJournal, i18n } from "./monks-enhanced-journal.js"
 import { EditCurrency } from "./apps/editcurrency.js"
 import { CustomisePages } from "./apps/customise-pages.js"
+import { AdjustPrice } from "./apps/adjust-price.js"
 import { APSJ } from "./apsjournal.js";
 
 export const registerSettings = function () {
@@ -91,6 +92,14 @@ export const registerSettings = function () {
 		icon: 'fas fa-file-lines',
 		restricted: true,
 		type: CustomisePages
+	});
+
+	game.settings.registerMenu(modulename, 'adjustPrices', {
+		label: i18n("MonksEnhancedJournal.adjustprices.name"),
+		hint: i18n("MonksEnhancedJournal.adjustprices.hint"),
+		icon: 'fas fa-money-bill-trend-up',
+		restricted: true,
+		type: AdjustPrice
 	});
 
 	game.settings.register(modulename, 'background-colour', {
