@@ -29,8 +29,19 @@
 // link-filled display (the "ancestry" detail field, whose display div is
 // nearly as narrow as its anchor - the case that reproduced the race during
 // implementation) is itself the regression check for that fix.
+//
+// enrichFields()'s @Foo[...] gate enriches ANY content-link syntax, not just
+// @UUID[JournalEntry...] - a hand-typed reference to some other document
+// type (Macro, Item, ...) or an unresolvable one is just as reachable as a
+// dropped journal link. _onFieldDisplayClick resolves the target from the
+// enricher's own anchor dataset (data-uuid primarily) and calls the
+// resolved document's own `_onClickDocumentLink` - the base Foundry
+// implementation already does the right per-type thing (execute a Macro,
+// render an Item sheet, ...) without MEJ hand-rolling type dispatch, and an
+// unresolvable `a.content-link.broken` is explicitly skipped (checked
+// below: a hand-typed Macro reference and a deliberately broken reference).
 import assert from 'node:assert/strict';
-import { withSession, createEntry, openEntry, dropOnSheet, assertNoErrors } from '../helpers/mej.js';
+import { withSession, createEntry, openEntry, setEntryFlag, dropOnSheet, assertNoErrors } from '../helpers/mej.js';
 
 const LOCATION_SEL = 'input[name="flags.monks-enhanced-journal.location"]';
 const ROLE_SEL = 'input[name="flags.monks-enhanced-journal.role"]';
@@ -142,6 +153,63 @@ await withSession('detail-field-links', { users: ['Gamemaster', 'User 1'] }, asy
   });
   assert.ok(idealsSwapped.visible, 'double-click on the full/textarea field display did not reveal the raw edit textarea');
   assert.equal(idealsSwapped.value, `@UUID[${targetUuid}]{TT-link-target}`, 'full/textarea field raw edit textarea does not contain the @UUID syntax');
+
+  // --- A hand-typed non-JournalEntry reference (Macro) resolves and
+  // activates on click, not just @UUID[JournalEntry...] drops ---
+  const macroUuid = await gm.evaluate(async () => {
+    let macro = game.macros.find((m) => m.name === 'TT-field-links-macro');
+    if (!macro) {
+      macro = await Macro.create({
+        name: 'TT-field-links-macro', type: 'script',
+        command: 'window.__mejFieldLinksMacroRan = true;',
+        ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
+      });
+    }
+    return macro.uuid;
+  });
+  const EYES_SEL = 'input[name="flags.monks-enhanced-journal.attributes.eyes"]';
+  await gm.click('.monks-enhanced-journal a[data-tab="entry-details"]');
+  await gm.waitForSelector(EYES_SEL, { state: 'attached' });
+  await setEntryFlag(gm, personId, 'attributes', {
+    ...(await gm.evaluate((id) => game.journal.get(id).pages.contents[0].getFlag('monks-enhanced-journal', 'attributes'), personId)),
+    eyes: `@UUID[${macroUuid}]{TT-field-links-macro}`,
+  });
+  await gm.evaluate(() => game.MonksEnhancedJournal.journal.render(true));
+  await gm.click('.monks-enhanced-journal a[data-tab="entry-details"]');
+  await gm.waitForSelector('.mej-field-display[data-field="eyes"] a.content-link', { state: 'attached' });
+  await gm.evaluate(() => { window.__mejFieldLinksMacroRan = false; });
+  await gm.click('.mej-field-display[data-field="eyes"] a.content-link');
+  await gm.waitForFunction(() => window.__mejFieldLinksMacroRan === true, null, { timeout: 3000 })
+    .catch(() => { throw new Error('hand-typed Macro reference did not resolve/activate on click (silent no-op)'); });
+  await gm.evaluate(() => delete window.__mejFieldLinksMacroRan);
+
+  // --- A deliberately broken reference renders as .broken and stays inert ---
+  const TRAITS_SEL = 'input[name="flags.monks-enhanced-journal.attributes.traits"]';
+  await gm.click('.monks-enhanced-journal a[data-tab="entry-details"]');
+  await gm.waitForSelector(TRAITS_SEL, { state: 'attached' });
+  await setEntryFlag(gm, personId, 'attributes', {
+    ...(await gm.evaluate((id) => game.journal.get(id).pages.contents[0].getFlag('monks-enhanced-journal', 'attributes'), personId)),
+    traits: '@UUID[JournalEntry.doesnotexist000000]{Ghost}',
+  });
+  await gm.evaluate(() => game.MonksEnhancedJournal.journal.render(true));
+  await gm.click('.monks-enhanced-journal a[data-tab="entry-details"]');
+  await gm.waitForSelector('.mej-field-display[data-field="traits"] a.content-link.broken', { state: 'attached' });
+  const brokenAffordance = await gm.evaluate(() =>
+    getComputedStyle(document.querySelector('.mej-field-display[data-field="traits"] a.content-link.broken')).pointerEvents);
+  assert.equal(brokenAffordance, 'none', 'a broken content-link must not carry a pointer/navigation affordance');
+  const docBeforeBrokenClick = await gm.evaluate(() => game.MonksEnhancedJournal.journal?.document?.id);
+  await gm.click('.mej-field-display[data-field="traits"]', { force: true });
+  await gm.waitForTimeout(400);
+  const docAfterBrokenClick = await gm.evaluate(() => game.MonksEnhancedJournal.journal?.document?.id);
+  assert.equal(docAfterBrokenClick, docBeforeBrokenClick, 'clicking a broken content-link should be a silent no-op, not navigate');
+  // A broken reference is still fixable: dblclick-to-edit must still work.
+  await gm.dblclick('.mej-field-display[data-field="traits"]');
+  const brokenEditState = await gm.evaluate(() => {
+    const input = document.querySelector('input.mej-field-edit[name="flags.monks-enhanced-journal.attributes.traits"]');
+    return { visible: input && getComputedStyle(input).display !== 'none', value: input?.value };
+  });
+  assert.ok(brokenEditState.visible, 'double-click on a broken field display did not reveal the raw edit input');
+  assert.equal(brokenEditState.value, '@UUID[JournalEntry.doesnotexist000000]{Ghost}', 'broken field raw edit input does not contain the original syntax');
 
   // --- Player: the enriched link renders and opens through MEJ too ---
   await openEntry(player, personId);
