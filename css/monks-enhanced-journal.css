@@ -691,6 +691,56 @@
     padding: 0px;
 }
 
+.monks-enhanced-journal .directory-sidebar > section .mej-search-results {
+    margin: 0px;
+    padding: 0px;
+    overflow-y: auto;
+}
+
+.monks-enhanced-journal .directory .mej-search-result {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 4px 8px;
+    border-top: 1px solid var(--mej-sidebar-document-border-top);
+    border-bottom: 1px solid var(--mej-sidebar-document-border-botom);
+    color: var(--mej-sidebar-document-color);
+    cursor: pointer;
+}
+
+.monks-enhanced-journal .directory .mej-search-result:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.monks-enhanced-journal .directory .mej-search-result .mej-search-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: bold;
+}
+
+.monks-enhanced-journal .directory .mej-search-result .mej-search-name i {
+    flex: 0 0 15px;
+}
+
+.monks-enhanced-journal .directory .mej-search-result .mej-search-snippet {
+    font-size: var(--font-size-12, 12px);
+    /* --mej-sidebar-label-color is a light tone meant for the darker header bar;
+       the row background here is the same cream parchment as the folder tree
+       (.directory-list document rows use --mej-sidebar-document-color), so use
+       the muted-but-readable placeholder tone instead. */
+    color: var(--mej-placeholder-color);
+    margin-left: 21px;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.monks-enhanced-journal .directory .mej-search-empty {
+    padding: 8px;
+    color: var(--mej-sidebar-document-color);
+    font-style: italic;
+}
+
 .monks-enhanced-journal .directory .directory-item.active {
     background: #cfcdc2;
 }
