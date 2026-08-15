@@ -94,5 +94,76 @@ await withSession('discord-fixes', { users: ['Gamemaster', 'User 1'] }, async (s
     try { await canvasSession.close(); } catch (e) { console.error(`discord-fixes section 1: canvasSession.close() failed: ${e.stack}`); }
   }
 
+  // --- 2. TableResult#text deprecation (quest/loot populate-from-rolltable) ---
+  // EnhancedJournalSheet#rollTable's per-result loop reads `tableresult.text`
+  // (removed in v15; deprecated since v13, warns via foundry.utils.logCompatibilityWarning
+  // -> console.warn, same capture pattern as section 1). It's the single shared
+  // method every itemtype's "populate from roll table" button calls (Quest's
+  // rewards tab is the stack Discord reported, but Loot/Shop/Encounter all
+  // route through the exact same code - see sheets/*.js onRoll*() handlers).
+  // We drive it through LootSheet rather than QuestSheet: quest's branch at
+  // the end of rollTable's yes-callback (`rewards[rewardId].itemIds = ...`)
+  // assumes an active reward already exists, which a freshly-created quest
+  // doesn't have (its rewards tab requires manually adding a reward first,
+  // itself unrelated to this bug) - Loot has no such precondition and reaches
+  // the identical deprecated read.
+  const trWarnings = [];
+  gm.on('console', (msg) => { if (msg.type() === 'warning' && msg.text().includes('TableResult#text')) trWarnings.push(msg.text()); });
+
+  let tableUuid, lootId;
+  try {
+    tableUuid = await gm.evaluate(async () => {
+      const table = await RollTable.implementation.create({
+        name: 'TT-discord-rolltable',
+        results: [{ type: CONST.TABLE_RESULT_TYPES?.TEXT ?? 'text', description: '10 gp', range: [1, 1] }],
+      });
+      return table.uuid;
+    });
+
+    lootId = await createEntry(gm, 'loot', 'TT-discord-loot');
+    await openEntry(gm, lootId);
+
+    // sheet-loot-items.hbs: the "Populate from Roll Table" header icon,
+    // data-action="rollItem" -> LootSheet.onRollItem -> this.rollTable(...).
+    await gm.click('[data-action="rollItem"]');
+    await gm.waitForSelector('dialog.dialog select[name="rollable-table"]', { state: 'visible' });
+
+    // roll-table.html's <select name="rollable-table"> options are keyed by
+    // raw uuid (selectGroups' groupid is undefined for this call site, so no
+    // prefix is prepended) - set it directly rather than via a real click
+    // sequence, matching foundry.js join()'s established "set .value + dispatch
+    // change" approach for selects that aren't guaranteed to behave like a
+    // vanilla <select> under Playwright's selectOption().
+    await gm.evaluate((uuid) => {
+      const el = document.querySelector('dialog.dialog select[name="rollable-table"]');
+      el.value = uuid;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, tableUuid);
+    await gm.click('dialog.dialog button[data-action="yes"]');
+
+    await gm.waitForFunction((id) => {
+      const items = game.journal.get(id)?.pages.contents[0]?.getFlag('monks-enhanced-journal', 'items') || {};
+      return Object.keys(items).length > 0;
+    }, lootId, { timeout: 10_000 });
+
+    assert.equal(trWarnings.length, 0, `TableResult#text deprecation fired: ${trWarnings[0] ?? ''}`);
+
+    // Warning-silence alone isn't enough - the deprecated getter forwards to
+    // the same value pre-fix, so also assert the rolled text actually landed
+    // as a populated loot item (the table's "10 gp" text result).
+    const itemNames = await gm.evaluate((id) => {
+      const items = game.journal.get(id)?.pages.contents[0]?.getFlag('monks-enhanced-journal', 'items') || {};
+      return Object.values(items).map((i) => i.name);
+    }, lootId);
+    assert.ok(itemNames.includes('10 gp'), `populated loot item missing rolled text "10 gp": ${JSON.stringify(itemNames)}`);
+  } finally {
+    // sweep() (run by withSession's finally) only clears game.journal/actors/items
+    // named 'TT-*' - RollTable documents live in a separate world collection
+    // (game.tables) it never touches, so this one needs explicit cleanup.
+    try {
+      if (tableUuid) await gm.evaluate(async (uuid) => { await (await fromUuid(uuid))?.delete(); }, tableUuid);
+    } catch {}
+  }
+
   assertNoErrors(session);
 });
