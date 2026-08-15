@@ -165,5 +165,141 @@ await withSession('discord-fixes', { users: ['Gamemaster', 'User 1'] }, async (s
     } catch {}
   }
 
+  // --- 3. Encounter-placement scene guard (Discord: "MATT Start Encounter") ---
+  // monks-enhanced-journal.js's "startencounter" Monks Active Tiles (MAT) tile
+  // action registers a `restrict` callback for its "location" ctrl that used
+  // to read `this.scene.id`. That callback is an arrow function nested inside
+  // Hooks.on("setupTileActions", (app) => {...}) - itself an arrow function -
+  // so `this` is never dynamically bindable; it resolves to the ES module's
+  // top-level `this`, which is `undefined` (this file ships via esmodules in
+  // module.json). MAT's own MonksActiveTiles.selectClick calls
+  // `restrict(canvas.scene, tileDocument)` as a bare function call when the
+  // user clicks the canvas to pick the "location" field's value while
+  // configuring a Start Encounter trigger on a Tile - `this.scene` throws
+  // there ("Cannot read properties of undefined (reading 'scene')"),
+  // matching the Discord report exactly, and aborts the click before the
+  // location is ever recorded. The fix reads `canvas.scene` directly (the
+  // established live-access pattern used elsewhere in this file, e.g. the
+  // EncounterTemplate code Task 5's section above exercises) instead of the
+  // never-valid `this.scene`.
+  //
+  // This is only reachable at all when Monks Active Tiles is installed and
+  // active - MEJ's registration itself lives inside a "setupTileActions" hook
+  // that only MAT fires. MAT is NOT part of this suite's standard module set
+  // (lib-wrapper, monks-tokenbar, tidy5e-sheet, monks-enhanced-journal) and
+  // must not be left installed after a suite run, so this section drives the
+  // real MAT relay only when it detects MAT active in the world, and falls
+  // back to a no-op skip (with the outer `assertNoErrors(session)` below and
+  // Task 5's own canvas-session assertion above still covering the "zero page
+  // errors" baseline) when it isn't - matching a normal run of this suite.
+  const matSession = await connect({ users: ['Gamemaster'], noCanvas: false });
+  const matGm = matSession.pages['Gamemaster'];
+  let tileId;
+  let matActive = false;
+  try {
+    matActive = await matGm.evaluate(() => game.modules.get('monks-active-tiles')?.active === true);
+    if (!matActive) {
+      console.log('discord-fixes section 3: monks-active-tiles not installed/active - skipping MAT-relayed repro (fix is still exercised by build-time review; see task-7-report.md)');
+    } else {
+      await matGm.waitForFunction(() => !!canvas?.ready, null, { timeout: 20_000 });
+
+      tileId = await matGm.evaluate(async () => {
+        const [tile] = await canvas.scene.createEmbeddedDocuments('Tile', [{
+          texture: { src: 'icons/svg/hazard.svg' }, x: 500, y: 500, width: 200, height: 200,
+        }]);
+        return tile.id;
+      });
+
+      // Open the (MAT-patched) Tile Config sheet and drill into its Triggers
+      // tab -> Actions sub-tab -> "+" (createAction) -> pick "Start Encounter"
+      // from MEJ's optgroup -> the "location" ctrl's crosshair picker button.
+      // This is the real, unmodified MAT UI path a GM uses to configure the
+      // trigger the Discord reporter hit - not a hand-rolled mock of MAT's
+      // internals.
+      await matGm.evaluate(async (id) => {
+        await canvas.scene.tiles.get(id).sheet.render(true);
+      }, tileId);
+      await matGm.waitForSelector('a[data-action="tab"][data-tab="activetile"]', { state: 'visible' });
+      await matGm.click('a[data-action="tab"][data-tab="activetile"]');
+      await matGm.click('div[data-tab="activetile"] a[data-action="tab"]:has-text("Actions")');
+      await matGm.click('div[data-tab="activetile"] button[data-action="createAction"]');
+      await matGm.waitForFunction(() => [...foundry.applications.instances.values()]
+        .some((a) => a.constructor.name === 'ActionConfig'), null, { timeout: 10_000 });
+
+      await matGm.evaluate(() => {
+        const actionCfg = [...foundry.applications.instances.values()].find((a) => a.constructor.name === 'ActionConfig');
+        const sel = actionCfg.element.querySelector('select[name="action"]');
+        sel.value = 'monks-enhanced-journal.startencounter';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await matGm.waitForSelector('[data-action-id="data.location"] button.location-picker[data-type="either"]', { state: 'visible' });
+      await matGm.click('[data-action-id="data.location"] button.location-picker[data-type="either"]');
+
+      // Entering "select a location" mode minimizes the config windows and
+      // arms MonksActiveTiles.waitingInput with the real restrict callback
+      // MEJ registered - the click handler's minimize() calls are async, so
+      // poll rather than checking immediately after the click resolves.
+      // Confirm that armed state before clicking canvas, so a failure to
+      // reach the click at all doesn't masquerade as a pass.
+      await matGm.waitForFunction(() => {
+        const wf = game.MonksActiveTiles.waitingInput?.waitingfield;
+        return !!wf && wf.data('type') === 'either' && typeof wf.data('restrict') === 'function';
+      }, null, { timeout: 10_000 });
+
+      // The real click: TilesLayer's canvas click handler (MAT-wrapped via
+      // libWrapper) -> MonksActiveTiles.canvasClick -> selectClick ->
+      // restrict(canvas.scene, tileDocument) - the exact call that threw in
+      // the Discord report's stack trace.
+      const board = await matGm.evaluate(() => {
+        const r = document.getElementById('board').getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+      await matGm.mouse.click(board.x, board.y);
+      await matGm.waitForTimeout(500);
+
+      // Pre-fix this never resolves false: the TypeError aborts selectClick
+      // before it clears waitingInput, matching the reporter's "unable to
+      // select a location on the scene" - so this is the direct assertion
+      // that a location was actually selectable, not just that nothing threw.
+      const stillWaiting = await matGm.evaluate(() => !!game.MonksActiveTiles.waitingInput);
+      assert.equal(stillWaiting, false, 'location was not selected - MonksActiveTiles.waitingInput still armed after the canvas click (restrict likely threw)');
+
+      assertNoErrors(matSession);
+    }
+  } finally {
+    try {
+      if (tileId) await matGm.evaluate(async (id) => { await canvas.scene.tiles.get(id)?.delete(); }, tileId);
+    } catch {}
+    try { await matSession.close(); } catch (e) { console.error(`discord-fixes section 3: matSession.close() failed: ${e.stack}`); }
+  }
+
+  if (matActive) {
+    // Creating/deleting the Tile above broadcasts real-time doc-change events
+    // to every connected client, including this suite's noCanvas
+    // 'Gamemaster'/'User 1' pages that stay joined for the whole spec. Two
+    // unrelated handlers there choke on canvas being uninitialized:
+    //  - MAT's own createTile/deleteTile hooks (monks-active-tiles.js
+    //    findTileTriggers()) unconditionally read `canvas.scene.tiles`
+    //    ("Cannot read properties of null (reading 'tiles')").
+    //  - Foundry core's own delete lifecycle (client/documents/abstract/
+    //    canvas-document.mjs _onDeleteOperation) unconditionally reads
+    //    `documents[0].layer.clipboard` - `TileDocument.layer` resolves to
+    //    `canvas.tiles`, which is undefined under core.noCanvas
+    //    ("Cannot read properties of null (reading 'clipboard')").
+    // Neither is reachable through MEJ's code and neither depends on whether
+    // restrict() is fixed - they're a MAT-active + noCanvas-client
+    // incompatibility inherent to this harness, not a regression. Filter only
+    // these two known artifacts (only reachable when MAT is actually active -
+    // MAT is not part of the standard suite module set, so this branch is
+    // dormant in ordinary runs) rather than masking real regressions.
+    const known = [
+      "Cannot read properties of null (reading 'tiles')",
+      "Cannot read properties of null (reading 'clipboard')",
+    ];
+    for (const [page, log] of session.logs) {
+      session.logs.set(page, log.filter((l) => !known.some((k) => l.includes(k))));
+    }
+  }
+
   assertNoErrors(session);
 });
