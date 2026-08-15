@@ -44,8 +44,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     searchresults = [];
     searchpos = 0;
     lastquery = '';
-    _imgcontext = null;
     subsheetState = {};
+    activatingTab = null;
 
     constructor(options) {
         super(options);
@@ -79,7 +79,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             navigatePrevious: EnhancedJournal.navigatePrevious,
             navigateNext: EnhancedJournal.navigateNext,
             activateEntry: EnhancedJournal.activateEntry,
-            toggleMaximize: EnhancedJournal.toggleMaximize
+            fullscreen: EnhancedJournal.fullscreen,
         },
         position: { width: 1025, height: 700 },
         form: {
@@ -134,6 +134,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         await super._preFirstRender(context, options);
 
         this.tabs = foundry.utils.duplicate(game.user.getFlag('monks-enhanced-journal', 'tabs') || [{ "id": makeid(), "text": i18n("MonksEnhancedJournal.NewTab"), "active": true, "history": [] }]);
+        this.removeDuplicateTabs();
         this.tabs = this.tabs.map(t => { delete t.entity; return t; })
         this.tabs.active = (findone = true) => {
             let tab = this.tabs.find(t => t.active);
@@ -175,7 +176,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         const frame = await super._renderFrame(options);
         if (!this.hasFrame) return frame;
 
-        const copyLabel = game.i18n.localize("SHEETS.CopyUuid");
+        const copyLabel = game.i18n.localize("APPLICATION.ACTIONS.CopyUuid");
         const copyId = `
     <button type="button" class="header-control fa-solid fa-passport icon" data-action="copyUuid"
             data-tooltip="${copyLabel}" aria-label="${copyLabel}"></button>
@@ -275,13 +276,18 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _getHeaderControls() {
         let controls = this.subsheet?._getHeaderControls?.() || [];
-        let maximized = this.element?.classList.contains("maximized");
-        return controls.concat([{
-            icon: maximized ? "fas fa-compress-arrows-alt" : "fas fa-expand-arrows-alt",
-            label: maximized ? "MonksEnhancedJournal.Restore" : "MonksEnhancedJournal.Maximize",
-            action: "toggleMaximize",
-            visible: true
-        }]);
+        for (let ctrl of controls) {
+            ctrl.onClick = (event) => this._handleContextClick(event, ctrl.action);
+        }
+        return controls;
+    }
+
+    _handleContextClick(event, action) {
+        let handler = this.subsheet.actions[action];
+
+        if (handler) {
+            handler.call(this.subsheet, event, event.target);
+        }
     }
 
     get entryType() {
@@ -403,21 +409,21 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             $(this).click(that.removeTab.bind(that, tab));
         });
 
-        $('.back-button, .forward-button', this.element).toggle(game.user.isGM || setting('allow-player')).on('click', this.navigateHistory.bind(this));
+        $('.back-button, .forward-button', this.element).toggle(MonksEnhancedJournal.canShowEnhancedJournal).on('click', this.navigateHistory.bind(this));
 
         return result;
     }
 
     async renderSubSheet(options = {}) {
         try {
-            const modes = JournalEntrySheet.VIEW_MODES;
+            const modes = foundry.applications.sheets.journal.JournalEntrySheet.VIEW_MODES;
 
             let currentTab = this.tabs.active();
             if (!currentTab) {
                 if (this.tabs.length)
                     currentTab = this.tabs[0];
                 else
-                    currentTab = this.addTab();
+                    currentTab = await this.addTab();
             }
             if (!currentTab.entity && !["blank", "folder"].includes(foundry.utils.getProperty(currentTab, "flags.monks-enhanced-journal.type")))
                 currentTab.entity = await this.findEntity(currentTab.entityId);
@@ -584,9 +590,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             $(subsheetElement).attr('class', classes);
             subsheet._replaceHTML.call(subsheet, result, subsheetElement, subsheetOptions);
 
-            if (!this.isEditable) {
+            if (!this.isEditable)
                 subsheet._toggleDisabled.call(subsheet, true);
-            }
 
             if (subsheet.refresh)
                 subsheet.refresh();
@@ -659,7 +664,15 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
             this.activateControls($('#left-journal-buttons', this.element).empty(), $('#right-journal-buttons', this.element).empty());
 
-            this.window.controls.classList.toggle("hidden", !Array.from(this._headerControlButtons()).length);
+            let hasDropdown = false;
+            for (const c of subsheet._getHeaderControls()) {
+                const visible = typeof c.visible === "function" ? c.visible.call(this) : c.visible ?? true;
+                if (visible) {
+                    hasDropdown = true;
+                    break;
+                }
+            }
+            this.window.controls.classList.toggle("hidden", !hasDropdown);
 
             this.document._sheet = null; //set this to null so that other things can open the sheet
             subsheet._state = subsheet.constructor.RENDER_STATES.RENDERED;
@@ -883,7 +896,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         this.saveTabs();
     }
 
-    addTab(entity, options = { activate: true, refresh: true }) {
+    async addTab(entity, options = { activate: true, refresh: true }) {
         if (entity?.currentTarget != undefined)
             entity = null;
 
@@ -907,11 +920,11 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         this.tabs.push(tab);
 
         if (options.activate)
-            this.activateTab(tab);  //activating the tab should save it
+            await this.activateTab(tab);  //activating the tab should save it
         else {
             this.saveTabs();
             if (options.refresh)
-                this.render(true, { focus: true });
+                await this.render(true, { focus: true });
         }
 
         this.updateRecent(tab.entity);
@@ -920,13 +933,19 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async activateTab(tab, event, options) {
+        // Am I currently activating a tab?
+        if (this._activatingTab && Date.now() - this._activatingTab < 1000)
+            return false;
+
         this.saveScrollPos();
 
         if (await this?.subsheet?.close() === false)
             return false;
 
+        this._activatingTab = Date.now();
+
         if (tab == undefined)
-            tab = this.addTab();
+            tab = await this.addTab();
 
         if (event != undefined)
             event.preventDefault();
@@ -949,13 +968,13 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         } else if (event?.shiftKey) {
             // Close this tab
-            this.removeTab(tab, event);
+            await this.removeTab(tab, event);
             tab = this.tabs.active(false);
             if (!tab) {
                 if (this.tabs.length)
                     tab = this.tabs[0];
                 else
-                    tab = this.addTab();
+                    tab = await this.addTab();
             }
         }
 
@@ -964,13 +983,6 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             tab.entity = await this.findEntity(tab.entityId, tab.text);
         }
 
-        /*
-        if (currentTab?.id == tab.id) {
-            this.display(tab.entity);
-            this.updateHistory();
-            return false;
-        }*/
-
         if (currentTab != undefined)
             currentTab.active = false;
         tab.active = true;
@@ -978,18 +990,10 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this._tabs)
             this._tabs.active = null;
 
-        //$('.back-button', this.element).toggleClass('disabled', !this.canBack(tab));
-        //$('.forward-button', this.element).toggleClass('disabled', !this.canForward(tab));
-
-        //$(`.journal-tab[data-tabid="${tab.id}"]`, this.element).addClass('active').siblings().removeClass('active');
-
-        //this.display(tab.entity);
-
         this.saveTabs();
 
-        //this.updateHistory();
         if (this.rendered)
-            this.render(true, options);
+            await this.render(true, options);
         else {
             window.setTimeout(() => {
                 $(`.journal-tab[data-tabid="${tab.id}"]`, this.element).addClass("active").siblings().removeClass("active");
@@ -998,10 +1002,12 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.updateRecent(tab.entity);
 
+        this._activatingTab = null;
+
         return true;
     }
 
-    updateTab(tab, entity, options = {}) {
+    async updateTab(tab, entity, options = {}) {
         if (!entity)
             return;
 
@@ -1018,7 +1024,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                 tab.pageId = options.pageId;
                 tab.anchor = options.anchor;
 
-                if ((game.user.isGM || setting('allow-player')) && tab.entityId != undefined) {    //only save the history if the player is a GM or they get the full journal experience... and if it's not a blank tab
+                if (MonksEnhancedJournal.canShowEnhancedJournal && tab.entityId != undefined) {    //only save the history if the player is a GM or they get the full journal experience... and if it's not a blank tab
                     if (tab.history == undefined)
                         tab.history = [];
                     if (tab.historyIdx != undefined) {
@@ -1047,10 +1053,13 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.rendered)
             return;
 
-        this.render(true, foundry.utils.mergeObject({ focus: true }, options));
+        await this.render(true, foundry.utils.mergeObject({ focus: true }, options));
     }
 
-    removeTab(tab, event) {
+    async removeTab(tab, event) {
+        if (event != undefined)
+            event.preventDefault();
+
         if (typeof tab == 'string')
             tab = this.tabs.find(t => t.id == tab);
 
@@ -1061,17 +1070,43 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         if (this.tabs.length == 0) {
-            this.addTab();
+            await this.addTab();
         } else {
             if (tab.active) {
                 let nextIdx = (idx >= this.tabs.length ? idx - 1 : idx);
-                if (!this.activateTab(nextIdx))
+                if (!await this.activateTab(nextIdx))
                     this.saveTabs();
             }
         }
 
         if (event != undefined)
             event.preventDefault();
+    }
+
+    removeDuplicateTabs() {
+        // Don't bother to remove duplicates if there are no tabs or only one tab
+        if (!this.tabs.length || this.tabs.length < 2)
+            return;
+
+        let tabs = this.tabs.filter((tab, index, self) => {
+            return index === self.findIndex((t) => t.entityId === tab.entityId);
+        });
+
+        if (tabs.length != this.tabs.length) {
+            // There were duplicates, so we need to make sure the active tab is still active after removing duplicates
+            // and update the tabs.
+            if (tabs.find(t => t.active) == undefined) {
+                let activeEntityId = this.tabs.active(true)?.entityId;
+                if (activeEntityId) {
+                    let activeTab = tabs.find(t => t.entityId === activeEntityId);
+                    if (activeTab) {
+                        activeTab.active = true;
+                    }
+                }
+            }
+                
+            this.tabs = tabs;
+        }
     }
 
     saveTabs() {
@@ -1169,7 +1204,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                 let icon = MonksEnhancedJournal.getIcon(type);
                 let item = {
                     label: entity.name || i18n("MonksEnhancedJournal.Unknown"),
-                    icon: `fas ${icon}`,
+                    icon: `<i class="fas ${icon}"></i>`,
                     onClick: (event, li) => {
                         let idx = i;
                         this.changeHistory(idx)
@@ -1245,31 +1280,31 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     async open(entity, newtab, options) {
         //if there are no tabs, then create one
         if (this.tabs.length == 0) {
-            this.addTab(entity);
+            await this.addTab(entity);
         } else {
             if (newtab === true) {
                 //the journal is getting created
                 //lets see if we can find  tab with this entity?
                 let tab = this.tabs.find(t => t.entityId?.includes(entity.id));
                 if (tab != undefined)
-                    this.activateTab(tab, null, options);
+                    await this.activateTab(tab, null, options);
                 else
-                    this.addTab(entity);
+                    await this.addTab(entity);
             } else {
                 if (await this?.subsheet?.close() !== false) {
                     // Check to see if this entity already exists in the tab list
                     let tab = this.tabs.find(t => t.entityId?.includes(entity.id));
                     if (tab != undefined)
-                        this.activateTab(tab, null, options);
+                        await this.activateTab(tab, null, options);
                     else
-                        this.updateTab(this.tabs.active(), entity, options);
+                        await this.updateTab(this.tabs.active(), entity, options);
                 }
             }
         }
     }
 
     async updateRecent(entity) {
-        if (entity.id && entity.type != "blank") {
+        if (entity?.id && entity.type != "blank") {
             let recent = game.user.getFlag("monks-enhanced-journal", "_recentlyViewed") || [];
             recent.findSplice(e => e.id == entity.id || typeof e != 'object');
             recent.unshift({ id: entity.id, uuid: entity.uuid, name: entity.name, type: entity.getFlag("monks-enhanced-journal", "type") });
@@ -1283,6 +1318,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     expandSidebar() {
         this._collapsed = false;
+        game.settings.set("monks-enhanced-journal", "start-collapsed", false);
         $('.enhanced-journal', this.element).removeClass('collapse');
         $('.sidebar-toggle', this.element).attr('data-tooltip', i18n("MonksEnhancedJournal.CollapseDirectory"));
         $('.sidebar-toggle i', this.element).removeClass('fa-caret-left').addClass('fa-caret-right');
@@ -1290,6 +1326,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     collapseSidebar() {
         this._collapsed = true;
+        game.settings.set("monks-enhanced-journal", "start-collapsed", true);
         $('.enhanced-journal', this.element).addClass('collapse');
         $('.sidebar-toggle', this.element).attr('data-tooltip', i18n("MonksEnhancedJournal.ExpandDirectory"));
         $('.sidebar-toggle i', this.element).removeClass('fa-caret-right').addClass('fa-caret-left');
@@ -1371,7 +1408,6 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onDrop(event) {
-        log('enhanced journal drop', event);
         let result = $(event.currentTarget).hasClass('enhanced-journal-header') ? false : this.subsheet._onDrop(event);
 
         if (result instanceof Promise)
@@ -1381,7 +1417,9 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             let data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
 
             if (data.tabid) {
-                const target = event.target.closest(".journal-tab") || null;
+                const target = event.target.closest(".journal-tab");
+                if (!target) return;
+
                 let tabs = foundry.utils.duplicate(this.tabs);
 
                 if (data.tabid === target.dataset.tabid) return; // Don't drop on yourself
@@ -1410,7 +1448,9 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                     flags: { 'monks-enhanced-journal': { 'tabs': tabs } }
                 }, { render: false });
             } else if (data.bookmarkId) {
-                const target = event.target.closest(".bookmark-button") || null;
+                const target = event.target.closest(".bookmark-button");
+                if (!target) return;
+
                 let bookmarks = foundry.utils.duplicate(this.bookmarks);
 
                 if (data.bookmarkId === target.dataset.bookmarkId) return; // Don't drop on yourself
@@ -1447,10 +1487,13 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onSubmitForm(formConfig, event) {
-        let form = $("form", this.form).get(0);
-        if (!form) throw new Error("The FormApplication subclass has no registered form element");
-        const formData = new foundry.applications.ux.FormDataExtended(form, { editors: this.editors });
-        await this.subsheet.constructor.onSubmit.call(this.subsheet, event, form, formData);
+        event.preventDefault();
+        //let form = $("form.content", this.form).get(0);
+        //if (!form) throw new Error("The FormApplication subclass has no registered form element");
+        //const mainFormData = new foundry.applications.ux.FormDataExtended(this.form, { editors: this.editors });
+        const formData = new foundry.applications.ux.FormDataExtended(this.form, { editors: this.editors });
+        delete formData.object.search;
+        await this.subsheet.constructor.onSubmit.call(this.subsheet, event, this.form, formData);
     }
 
     /*
@@ -1473,8 +1516,17 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         //don't do anything, but leave this here to prevent the regular journal page from doing anything
     }
 
-    static toggleMaximize(event) {
-        this.fullscreen();
+    _getFrameButtons(options) {
+        let buttons = super._getFrameButtons(options);
+
+        buttons.unshift({
+            label: i18n("MonksEnhancedJournal.Maximize"),
+            class: "toggle-fullscreen",
+            icon: "fas fa-expand-arrows-alt",
+            action: "fullscreen"
+        });
+
+        return buttons;
     }
 
     static doShowPlayers(event) {
@@ -1487,14 +1539,17 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    fullscreen() {
-        if (this.element.classList.contains("maximized")) {
-            this.element.classList.remove("maximized");
+    static fullscreen() {
+        let $element = $(this.element);
+        if ($element.hasClass("maximized")) {
+            $element.removeClass("maximized");
+            $('.header-control[data-action="fullscreen"]', $element).removeClass('fa-compress-arrows-alt').addClass('fa-expand-arrows-alt').attr("data-tooltip", i18n("MonksEnhancedJournal.Maximize"));
             this.setPosition({ width: this._previousPosition.width, height: this._previousPosition.height });
             this.setPosition({ left: this._previousPosition.left, top: this._previousPosition.top });
         } else {
-            this.element.classList.add("maximized");
-
+            $element.addClass("maximized");
+            $('.header-control[data-action="fullscreen"]', $element).removeClass('fa-expand-arrows-alt').addClass('fa-compress-arrows-alt').attr("data-tooltip", i18n("MonksEnhancedJournal.Restore"));
+            
             this._previousPosition = foundry.utils.duplicate(this.position);
             this.setPosition({ left: 0, top: 0 });
             this.setPosition({ height: $('body').height(), width: $('body').width() - $('#sidebar').width() });
@@ -1526,10 +1581,10 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _createContextMenus(html) {
-        this._context = new foundry.applications.ux.ContextMenu(html, ".bookmark-button", [
+        this._context = new foundry.applications.ux.ContextMenu(html, ".bookmark-button:not(.add-bookmark)", [
             {
                 label: "Open outside Enhanced Journal",
-                icon: "fas fa-file-export",
+                icon: 'fas fa-file-export',
                 onClick: async (event, li) => {
                     let bookmark = this.bookmarks.find(b => b.id == li.dataset.bookmarkId);
                     let document = await fromUuid(bookmark.entityId);
@@ -1546,7 +1601,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             },
             {
                 label: "Open in new tab",
-                icon: "fas fa-file-export",
+                icon: 'fas fa-file-export',
                 onClick: async (event, li) => {
                     let bookmark = this.bookmarks.find(b => b.id == li.dataset.bookmarkId);
                     let document = await fromUuid(bookmark.entityId);
@@ -1561,7 +1616,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             },
             {
                 label: "MonksEnhancedJournal.Delete",
-                icon: "fas fa-trash",
+                icon: 'fas fa-trash',
                 onClick: (event, li) => {
                     const bookmark = this.bookmarks.find(b => b.id === li.dataset.bookmarkId);
                     this.removeBookmark(bookmark);
@@ -1572,7 +1627,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         this._tabcontext = new foundry.applications.ux.ContextMenu(html, ".enhanced-journal-header .tab-bar", [
             {
                 label: "Open outside Enhanced Journal",
-                icon: "fas fa-file-export",
+                icon: 'fas fa-file-export',
                 visible: (li) => {
                     let tab = this.tabs.find(t => t.id == this.contextTab);
                     if (!tab) return false;
@@ -1593,7 +1648,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             },
             {
                 label: "Close Tab",
-                icon: "fas fa-trash",
+                icon: 'fas fa-trash',
                 onClick: (event, li) => {
                     let tab = this.tabs.find(t => t.id == this.contextTab);
                     if (tab)
@@ -1602,7 +1657,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             },
             {
                 label: "Close All Tabs",
-                icon: "fas fa-dumpster",
+                icon: 'fas fa-dumpster',
                 onClick: (event, li) => {
                     this.tabs.splice(0, this.tabs.length);
                     this.saveTabs();
@@ -1611,7 +1666,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             },
             {
                 label: "Close Other Tabs",
-                icon: "fas fa-dumpster",
+                icon: 'fas fa-dumpster',
                 onClick: (event, li) => {
                     let tab = this.tabs.find(t => t.id == this.contextTab);
                     if (tab) {
@@ -1625,7 +1680,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             },
             {
                 label: "Close To the right",
-                icon: "fas fa-dumpster",
+                icon: 'fas fa-dumpster',
                 onClick: (event, li) => {
                     let tab = this.tabs.find(t => t.id == this.contextTab);
                     if (tab) {
@@ -1656,16 +1711,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         let history = await this.getHistory();
-        this._historycontext = new foundry.applications.ux.ContextMenu(this.element, ".mainbar .navigation .nav-button.history", history, { fixed: true, jQuery: false });
-        this._imgcontext = new foundry.applications.ux.ContextMenu(this.element, ".journal-body.oldentry .tab.picture", [
-            {
-                label: "MonksEnhancedJournal.Delete",
-                icon: "fas fa-trash",
-                onClick: (event, li) => {
-                    log('Remove image on old entry');
-                }
-            }
-        ], { fixed: true, jQuery: false });
+        this._historycontext = new foundry.applications.ux.ContextMenu(this.element, ".enhanced-journal-header .navigation .nav-button.history", history, { fixed: true, jQuery: false });
     }
 
     async _onChangeInput(event) {

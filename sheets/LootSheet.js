@@ -42,6 +42,20 @@ export class LootSheet extends EnhancedJournalSheet {
     };
 
     /*
+    static get defaultOptions() {
+        return foundry.utils.mergeObject(super.defaultOptions, {
+            title: i18n("MonksEnhancedJournal.sheettype.loot"),
+            template: "modules/monks-enhanced-journal/templates/sheets/loot.html",
+            dragDrop: [
+                { dragSelector: ".document.item", dropSelector: ".loot-container" },
+                { dragSelector: ".loot-items .item-list .item .item-name", dropSelector: "null" },
+                { dragSelector: ".loot-items .item-list .item .item-name", dropSelector: ".loot-character" },
+                { dragSelector: ".loot-character", dropSelector: "null" },
+                { dragSelector: ".sheet-icon", dropSelector: "#board" }
+            ],
+            scrollY: [".loot-items"]
+        });
+    }
     */
 
     static get type() {
@@ -241,8 +255,7 @@ export class LootSheet extends EnhancedJournalSheet {
             for (let [key, item] of Object.entries(items)) {
                 let quantity = foundry.utils.getProperty(item, "flags.monks-enhanced-journal.quantity") ?? 0;
                 if (quantity <= 0) {
-                    delete items[key];
-                    items[`-=${key}`] = null;
+                    items[key] = new foundry.data.operators.ForcedDeletion();
                 }
             }
             submitData.flags['monks-enhanced-journal'].items = items;
@@ -314,7 +327,7 @@ export class LootSheet extends EnhancedJournalSheet {
                         let itemQty = getValue(itemData, quantityname(), 1);
                         setValue(itemData, quantityname(), result.quantity * itemQty);
                         let sheet = actor.sheet;
-                        if (sheet._onDropItem)
+                        if (MonksEnhancedJournal.canDropOnActorSheet(sheet))
                             sheet._onDropItem({ preventDefault: () => { }, target: { closest: () => { } } }, itemData );
                         else
                             actor.createEmbeddedDocuments("Item", [itemData]);
@@ -498,7 +511,7 @@ export class LootSheet extends EnhancedJournalSheet {
                 let itemQty = getValue(itemData, quantityname(), 1);
                 setValue(itemData, quantityname(), result.quantity * itemQty);
                 let sheet = actor.sheet;
-                if (sheet._onDropItem)
+                if (MonksEnhancedJournal.canDropOnActorSheet(sheet))
                     sheet._onDropItem({ preventDefault: () => { }, target: { closest: () => { } } }, itemData);
                 else
                     actor.createEmbeddedDocuments("Item", [itemData]);
@@ -549,7 +562,7 @@ export class LootSheet extends EnhancedJournalSheet {
             let itemQty = getValue(itemData, quantityname(), 1);
             setValue(itemData, quantityname(), result.quantity * itemQty);
             let sheet = actor.sheet;
-            if (sheet._onDropItem)
+            if (MonksEnhancedJournal.canDropOnActorSheet(sheet))
                 sheet._onDropItem({ preventDefault: () => { }, target: { closest: () => { } } }, itemData );
             else
                 actor.createEmbeddedDocuments("Item", [itemData]);
@@ -703,8 +716,7 @@ export class LootSheet extends EnhancedJournalSheet {
     removeActor(id) {
         if (id) {
             let actors = foundry.utils.duplicate(this.document.getFlag('monks-enhanced-journal', 'actors') || {});
-            delete actors[id];
-            actors[`-=${id}`] = null;
+            actors[id] = new foundry.data.operators.ForcedDeletion();
             this.document.setFlag('monks-enhanced-journal', 'actors', actors);
         }
     }
@@ -713,7 +725,7 @@ export class LootSheet extends EnhancedJournalSheet {
         return [
             {
                 label: "Transfer Funds",
-                icon: '<i class="fas fa-user"></i>',
+                icon: 'fas fa-user',
                 visible: () => game.user.isGM,
                 onClick: (event, li) => {
                     const id = li.id;
@@ -723,7 +735,7 @@ export class LootSheet extends EnhancedJournalSheet {
             },
             {
                 label: i18n("MonksEnhancedJournal.RemoveActor"),
-                icon: '<i class="fas fa-trash"></i>',
+                icon: 'fas fa-trash',
                 visible: () => game.user.isGM,
                 onClick: (event, li) => {
                     const id = li.id;

@@ -9,42 +9,18 @@ export class ProseMirrorPlugin {
 
 			let font_sizes = [8, 10, 12, 14, 18, 24, 36, 48];
 
-			let marks = {
-				fontsize: {
-					attrs: {
-						fontsize: {}
-					},
-					inclusive: true,
-					parseDOM: [{ tag: "span", getAttrs: dom => ({ fontsize: dom.style.fontSize }) }],
-					toDOM: (mark) => {
-						return ["span", { style: `font-size: ${mark.attrs.fontsize}px` }]
-					}
-				},
-				mejreadaloud: {
-					attrs: {},
-					inclusive: true,
-					parseDOM: [{ tag: "section" }],
-					toDOM: () => {
-						return ["section", { class: "readaloud" }]
-					}
-				}
-			}
-
-			let schema = new ProseMirror.Schema({ nodes: menu.schema.spec.nodes, marks: menu.schema.spec.marks.append(marks) });
-			menu.schema.marks.fontsize = schema.marks.fontsize;
-			menu.schema.marks.mejreadaloud = schema.marks.mejreadaloud;
-
 			items.fontsize = {
 				cssClass: 'mej-menu-fontsize',
 				title: "Font Size",
 				entries: font_sizes.map((fontsize) => {
+					let size = `${fontsize}px`;
 					return {
 						action: `size${fontsize}`,
 						title: `${fontsize}px`,
 						style: `font-size: ${fontsize}px;line-height: ${Math.max(24, fontsize)}px`,
-						mark: menu.schema.marks.fontsize,
-						attrs: { fontsize },
-						cmd: ProseMirror.commands.toggleMark(menu.schema.marks.fontsize, { fontsize })
+						mark: menu.schema.marks.size,
+						attrs: { size },
+						cmd: ProseMirror.commands.toggleMark(menu.schema.marks.size, { size })
 					}
 				}),
 			};
@@ -84,22 +60,6 @@ export class ProseMirrorPlugin {
 		if (menu.view.dom.closest('.monks-journal-sheet,.journal-sheet.journal-entry-page')) {
 			const scopes = menu.constructor._MENU_ITEM_SCOPES;
 
-			let marks = {
-				color: {
-					attrs: {
-						color: {}
-					},
-					inclusive: true,
-					parseDOM: [{ tag: "span", getAttrs: dom => ({ color: dom.style.color }) }],
-					toDOM: (mark) => {
-						return ["span", { style: `color: ${mark.attrs.color}` }]
-					}
-				}
-			}
-
-			let schema = new ProseMirror.Schema({ nodes: menu.schema.spec.nodes, marks: menu.schema.spec.marks.append(marks) });
-			menu.schema.marks.color = schema.marks.color;
-
 			items.splice(5, 0, {
 				action: "background-colour",
 				title: "Change Background",
@@ -108,15 +68,6 @@ export class ProseMirrorPlugin {
 				priority: 10,
 				cssClass: "mej-change-background",
 				cmd: ProseMirrorPlugin._changeBackgroundPrompt.bind(menu)
-			});
-
-			items.splice(5, 0, {
-				action: "text-colour",
-				title: "Change Text Colour",
-				icon: '<i class="fa-solid fa-paintbrush fa-fw"></i>',
-				scope: scopes.BOTH,
-				cssClass: "mej-change-text-colour",
-				cmd: ProseMirrorPlugin._changeTextColourPrompt.bind(menu)
 			});
 
 			items.splice(8, 0, {
@@ -201,7 +152,7 @@ export class ProseMirrorPlugin {
 	}
 
 	static async _changeBackgroundPrompt() {
-		const documentUuid = $(this.view.dom).closest("form").attr("entity-uuid");
+		const documentUuid = $(this.view.dom).closest("div[entity-uuid]").attr("entity-uuid");
 		const document = documentUuid ? await fromUuid(documentUuid) : null;
 
 		if (document == null)
@@ -230,53 +181,6 @@ export class ProseMirrorPlugin {
 			};
 			document.setFlag('monks-enhanced-journal', 'style', updateStyle);
 			EnhancedJournalSheet.updateStyle(updateStyle, $(this.view.dom.closest(".editor-parent")));
-			dialog.remove();
-		});
-		form.elements.cancel.addEventListener("click", () => {
-			dialog.remove();
-		});
-	}
-
-	static async _changeTextColourPrompt() {
-		const state = this.view.state;
-		const { $from, $to, $cursor } = state.selection;
-
-		let data = {
-			color: window.getComputedStyle(this.view.dom).color || "#000000"
-		}
-
-		const mark = this.schema.marks.color;
-
-		const links = [];
-		state.doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
-			if (node.marks.some(m => m.type === this.schema.marks.color)) links.push([node, pos]);
-		});
-		const existing = links.length === 1 && links[0];
-		if (existing) {
-			const [node] = existing;
-			if ($cursor) data.text = node.text;
-			// Pre-fill the dialog with the existing link's attributes.
-			const link = node.marks.find(m => m.type === this.schema.marks.color);
-			data.color = link.attrs.color || window.getComputedStyle(this.view.dom).color || "#000000";
-		}
-
-		const dialog = await this._showDialog("text-colour", "modules/monks-enhanced-journal/templates/prosemirror/text-colour.html", { data });
-		const form = dialog.querySelector("form");
-		const color = form.elements.color;
-		form.elements.update.addEventListener("click", () => {
-			if (!color.value) return;
-
-			const link = this.schema.marks.color.create({ color: color.value });
-			const tr = state.tr;
-
-			if (existing && $cursor) {
-				const [node, pos] = existing;
-				const selection = TextSelection.create(state.doc, pos, pos + node.nodeSize);
-				tr.setSelection(selection);
-			}
-
-            tr.addMark($from.pos, $to.pos, link);
-			this.view.dispatch(tr);
 			dialog.remove();
 		});
 		form.elements.cancel.addEventListener("click", () => {

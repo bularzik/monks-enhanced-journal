@@ -51,6 +51,19 @@ export class SlideshowSheet extends EnhancedJournalSheet {
     };
 
     /*
+    static get defaultOptions() {
+        return foundry.utils.mergeObject(super.defaultOptions, {
+            title: i18n("MonksEnhancedJournal.sheettype.slideshow"),
+            template: "modules/monks-enhanced-journal/templates/sheets/slideshow.html",
+            tabs: [{ navSelector: ".tabs", contentSelector: ".sheet-body", initial: "entry-details" }],
+            dragDrop: [
+                { dragSelector: ".slide", dropSelector: ".slide" },
+                { dragSelector: ".slide", dropSelector: ".slideshow-body" },
+                { dragSelector: ".sheet-icon", dropSelector: "#board" }
+            ],
+            scrollY: [".tab.entry-details .tab-inner", ".tab.slides .tab-inner"]
+        });
+    }
     */
 
     static get type() {
@@ -202,6 +215,16 @@ export class SlideshowSheet extends EnhancedJournalSheet {
 
     get canPlaySound() {
         return false;
+    }
+
+    async _preFirstRender(context, options = {}) {
+        let result = await super._preFirstRender(context, options);
+
+        if (!this.document.testUserPermission(game.user, "OWNER") || options.play) {
+            this.playSlideshow();
+        }
+
+        return result;
     }
 
     static async createSlideThumbnail(src) {
@@ -791,7 +814,7 @@ export class SlideshowSheet extends EnhancedJournalSheet {
         return [
             {
                 label: "MonksEnhancedJournal.EditSlide",
-                icon: '<i class="fas fa-edit"></i>',
+                icon: 'fas fa-edit',
                 visible: game.user.isGM,
                 onClick: (event, elem) => {
                     let li = $(elem).closest('.slide');
@@ -803,7 +826,7 @@ export class SlideshowSheet extends EnhancedJournalSheet {
             },
             {
                 label: "SIDEBAR.Duplicate",
-                icon: '<i class="far fa-copy"></i>',
+                icon: 'far fa-copy',
                 visible: () => game.user.isGM,
                 onClick: (event, elem) => {
                     let li = $(elem).closest('.slide');
@@ -814,7 +837,7 @@ export class SlideshowSheet extends EnhancedJournalSheet {
             },
             {
                 label: "SIDEBAR.Delete",
-                icon: '<i class="fas fa-trash"></i>',
+                icon: 'fas fa-trash',
                 visible: () => game.user.isGM,
                 onClick: (event, elem) => {
                     let li = $(elem).closest('.slide');

@@ -61,6 +61,21 @@ export class ShopSheet extends EnhancedJournalSheet {
     };
 
     /*
+    static get defaultOptions() {
+        return foundry.utils.mergeObject(super.defaultOptions, {
+            title: i18n("MonksEnhancedJournal.sheettype.shop"),
+            template: "modules/monks-enhanced-journal/templates/sheets/shop.html",
+            tabs: [{ navSelector: ".tabs", contentSelector: ".sheet-body", initial: "description" }],
+            dragDrop: [
+                { dragSelector: ".document.actor", dropSelector: ".shop-container" },
+                { dragSelector: ".document.item", dropSelector: ".shop-container" },
+                { dragSelector: ".shop-items .item-list .item .item-name", dropSelector: "null" },
+                { dragSelector: ".actor-img img", dropSelector: "null" },
+                { dragSelector: ".sheet-icon", dropSelector: "#board" }
+            ],
+            scrollY: [".shop-items > .item-list", ".tab.description .tab-inner"]
+        });
+    }
     */
 
     static get type() {
@@ -640,7 +655,7 @@ export class ShopSheet extends EnhancedJournalSheet {
             }
         };
 
-        ChatMessage.create(messageData, {});
+        foundry.documents.ChatMessage.implementation.create(messageData, {});
     }
 
     static onClickItem(event, target) {

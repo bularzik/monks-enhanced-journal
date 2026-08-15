@@ -19,7 +19,7 @@
                         {{#if this.letter}}<div class="loot-player" data-tooltip="{{this.username}}" style="background-color: {{this.color}};">{{this.letter}}</div>{{/if}}
                     </li>
                     {{else}}
-                    {{#if owner}}
+                    {{#if (and owner editable)}}
                     <li class="instruction" style="height: 90px;">{{localize 'MonksEnhancedJournal.msg.DragActorsHere'}}</li>
                     {{/if}}
                     {{/each}}

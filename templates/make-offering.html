@@ -55,8 +55,8 @@
                 {{/each}}
             </ol>
             {{else}}
-            <div class="instruction">Drag items here, from a player's inventory, to make an offer</div>
-            {{/if}}
+        <div class="instruction">
+            {{#if (and owner editable)}}Drag items here, from a player's inventory, to make an offer{{/if}}
         </div>
     </div>
 </div>
