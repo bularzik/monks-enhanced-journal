@@ -979,10 +979,25 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         element.querySelectorAll("secret-block").forEach(b => b.revealable = !disabled);
         const form = this.form;
         if (!form) return;
-        for (const el of form.elements) el.disabled = disabled;
-        for (const input of form.querySelectorAll("input[type=image]")) input.disabled = disabled;
-        for (const img of form.querySelectorAll("img[data-edit]")) img.classList.toggle("disabled", disabled);
-        if (disabled) this._disableFields(form);
+        // Scope the disable/enable sweep to this subsheet's own content
+        // (`element`/trueElement), not `form.elements`. `this.form` resolves to
+        // `this.enhancedjournal.form` - the single top-level <form> wrapping the
+        // ENTIRE EnhancedJournal shell (DEFAULT_OPTIONS tag:"form"), which also
+        // contains the directory-sidebar's search/sort/collapse-folders buttons.
+        // Before the get-form() fix, this.form was undefined, so the `if (!form)
+        // return;` above always short-circuited and this method was a silent
+        // no-op - the form.elements bug below was latent and never observed.
+        // Now that get form() correctly resolves, iterating form.elements
+        // disables every control in the whole app (not just this subsheet)
+        // whenever the CURRENT subsheet isn't editable by this user (e.g. a
+        // player viewing an OBSERVER-only entry) - permanently disabling the
+        // directory search-mode toggle, sort toggle, etc. for the rest of the
+        // session, since nothing outside the subsheet's own replaced content
+        // ever gets a matching _toggleDisabled(false) to re-enable it.
+        for (const el of element.querySelectorAll("input, select, textarea, button")) el.disabled = disabled;
+        for (const input of element.querySelectorAll("input[type=image]")) input.disabled = disabled;
+        for (const img of element.querySelectorAll("img[data-edit]")) img.classList.toggle("disabled", disabled);
+        if (disabled) this._disableFields(element);
     }
 
     _disableFields(form) {
