@@ -8,7 +8,7 @@ import { connect } from '../helpers/foundry.js';
 
 await withSession('discord-fixes', { users: ['Gamemaster', 'User 1'] }, async (session) => {
   const gm = session.pages['Gamemaster'];
-  const player = session.pages['User 1']; // reserved for later sections (Tasks 6-8/10)
+  const player = session.pages['User 1']; // used by section 4 below
 
   // --- 1. encounter ControlIcon deprecation (Discord: "Create Encounter Buttons") ---
   // EncounterTemplate._draw() is only reachable through a real canvas template
@@ -298,6 +298,222 @@ await withSession('discord-fixes', { users: ['Gamemaster', 'User 1'] }, async (s
     ];
     for (const [page, log] of session.logs) {
       session.logs.set(page, log.filter((l) => !known.some((k) => l.includes(k))));
+    }
+  }
+
+  // --- 4. players can reopen their own handouts; Show-to-Players reaches them ---
+  // Discord: "Players can't open the journal" (N0P3_0ne). Triage (task-8-report.md /
+  // notes-player-open-triage.md) found TWO independent, silent bugs:
+  //  (a) core ClientDocument.createDialog() (Foundry v13+'s sidebar "Create Journal
+  //      Entry" flow) creates with renderSheet:false and renders doc.sheet itself,
+  //      bypassing MEJ's JournalEntry._onCreate open-gate - the 14.04b hotfix family
+  //      (302e778+3d00a29), cherry-picked onto maint/14.00-sync for this task.
+  //  (b) EnhancedJournalSheet's `get form()` searched for a <form> nested inside the
+  //      EnhancedJournal shell ($("form", this.enhancedjournal.form)) - broken by the
+  //      independently-legitimate templates/main.html <form>->div change, which
+  //      removed that nested <form> entirely. Any embedded-subsheet action calling
+  //      this.submit() - including the real "Show to Players" header action - then
+  //      crashed inside core's FormDataExtended#processFormFields before doing
+  //      anything, silently swallowing the action for both GM and player. A
+  //      maintainer-sync-merge-only regression, NOT part of the 14.04b family -
+  //      fixed directly on maint/14.00-sync (this task).
+  //
+  // Expected to PASS on: maint/14.00-sync AFTER the task-8 amendment (both fixes
+  // above are present), and on enhancements-test (has the 14.04b hotfix under
+  // different SHAs - e0c3ae2/0dccb25 - and never took the <form>->div change, so
+  // never had bug (b) to begin with).
+  // Expected to FAIL on: maint/14.00-sync BEFORE the task-8 amendment (both bugs
+  // reproduce live, full stack traces in notes-player-open-triage.md), and on any
+  // hypothetical tree that has 14.04b's createDialog fix but not this task's
+  // `get form()` fix (bug (b) alone still crashes "Show to Players").
+  {
+    // world-a's stock Permissions Configuration matches Foundry's own default
+    // (JOURNAL_CREATE: [TRUSTED, ASSISTANT, GAMEMASTER] = [2,3,4]) - a PLAYER-role
+    // user has no "Create Journal Entry" button in the sidebar at all, core-side,
+    // independent of MEJ. Grant it for this section only and restore it after -
+    // this must not leak into other spec files that assume the stock permission set.
+    const originalPermissions = await gm.evaluate(() => game.settings.get('core', 'permissions'));
+    const grantedJournalCreate = !originalPermissions.JOURNAL_CREATE?.includes(1);
+    if (grantedJournalCreate) {
+      await gm.evaluate(async () => {
+        const perms = game.settings.get('core', 'permissions');
+        perms.JOURNAL_CREATE = [...new Set([...(perms.JOURNAL_CREATE ?? []), 1])];
+        await game.settings.set('core', 'permissions', perms);
+      });
+      await player.reload();
+      await player.waitForFunction(() => window.game?.ready === true, null, { timeout: 30_000 });
+    }
+
+    // MEJ persists the EnhancedJournal shell's open tabs as a USER FLAG
+    // (apps/enhanced-journal.js: `this.tabs = ... game.user.getFlag('monks-enhanced-
+    // journal', 'tabs') || [...]`), not just in-memory/localStorage - it survives a
+    // page reload and leaks across separate test runs. Left alone, a stale tab from
+    // an earlier run (or an unrelated earlier fixture entry) can be the ACTIVE tab
+    // when EnhancedJournal reopens, making `.document` resolve to that leftover
+    // document instead of the one this section just created - clear it so every run
+    // starts from a real "no tabs open" state, matching a genuinely fresh player.
+    await player.evaluate(async () => { await game.user.unsetFlag('monks-enhanced-journal', 'tabs'); });
+
+    let handoutId;
+    try {
+      // Skeleton check from the task brief: a programmatic create + .sheet.render(true)
+      // reopen. Kept as a cheap first assertion, but NOT sufficient coverage on its
+      // own - during this task's manual triage the programmatic path stayed green
+      // in scenarios where the real UI path (below) failed, which is exactly the
+      // reported bug.
+      handoutId = await player.evaluate(async () => {
+        const je = await JournalEntry.implementation.create({ name: 'TT-discord-handout',
+          pages: [{ name: 'TT-discord-handout', type: 'text', text: { content: '<p>hi</p>' } }] });
+        return je.id;
+      });
+      await player.evaluate((id) => { for (const app of foundry.applications.instances.values()) { if (app.document?.id === id) app.close(); } }, handoutId);
+      await player.evaluate((id) => game.journal.get(id).sheet.render(true), handoutId);
+      await player.waitForTimeout(1000);
+      const reopened = await player.evaluate((id) =>
+        [...foundry.applications.instances.values()].some(a => a.document?.id === id && a.rendered), handoutId);
+      assert.ok(reopened, 'player could not reopen their own handout (programmatic path)');
+
+      await player.evaluate(async (id) => { await game.journal.get(id)?.delete(); }, handoutId);
+      handoutId = null;
+
+      // Reload before the real UI path: the programmatic check above can leave
+      // MonksEnhancedJournal.journal (MEJ's shared browser shell) instantiated in
+      // some intermediate tab/document state from the raw `.sheet.render(true)`
+      // call, which isn't how a real user would have gotten there and has been
+      // observed to make the createDialog-race assertion below flaky/misleading.
+      // Starting the real-UI portion from a clean client avoids that entirely.
+      await player.reload();
+      await player.waitForFunction(() => window.game?.ready === true, null, { timeout: 30_000 });
+
+      // --- Real UI path: sidebar "Create Journal Entry" -> close -> real sidebar
+      // dblclick to reopen. This is the actual reported gesture, not a synthetic
+      // equivalent - v14 replaced the old double-click-to-open with a single-click
+      // `activateEntry` action (client/applications/sidebar/document-directory.mjs
+      // _onClickEntry), so a dblclick here fires that handler twice.
+      await player.evaluate(() => { ui.sidebar.expand(); ui.sidebar.changeTab('journal', 'primary'); });
+      await player.waitForSelector('[data-action="createEntry"]', { timeout: 15_000 });
+      await player.click('[data-action="createEntry"]');
+      await player.waitForSelector('dialog input[name="name"]', { timeout: 15_000 });
+
+      const UI_NAME = 'TT-discord-handout-ui';
+      await player.fill('dialog input[name="name"]', UI_NAME);
+      // Pick an MEJ single-sheet type explicitly - the dialog's default ("text") is
+      // a plain core type MEJ never claims, so it can't exercise the createDialog
+      // race at all. "journalentry" (MEJ's generic viewer) is the variant that
+      // reproduced a real console crash during triage.
+      await player.evaluate(() => {
+        const el = document.querySelector('dialog select[name="flags.monks-enhanced-journal.pagetype"]');
+        el.value = 'journalentry';
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await player.click('dialog button[data-action="ok"], dialog button[type="submit"]');
+      await player.waitForTimeout(2000);
+
+      handoutId = await player.evaluate((name) => game.journal.getName(name)?.id ?? null, UI_NAME);
+      assert.ok(handoutId, `entry "${UI_NAME}" was not created via the real sidebar dialog`);
+
+      // EnhancedJournal is a multi-tab shell (apps/enhanced-journal.js); its own
+      // `.document` getter tracks whichever tab last finished activating, and tab
+      // activation is fire-and-forget/queued (queueTabChange), not synchronous with
+      // addTab() - so polling is needed. A single-page entry auto-drills into that
+      // page (shell.document ends up being the JournalEntryPage, not the parent
+      // JournalEntry - confirmed live: shell.document.constructor.name was
+      // "JournalEntryPage5e", .parent.id === the entry id passed in), so match
+      // either the entry id itself or its current page's parent id.
+      const rendersMEJ = (id) => player.waitForFunction((id) => {
+        const shell = game.MonksEnhancedJournal?.journal;
+        if (!shell?.rendered) return false;
+        const shown = shell.subsheet?.document ?? shell.document;
+        if (!shown) return false;
+        return shown.id === id || shown.parent?.id === id;
+      }, id, { timeout: 10_000 }).then(() => true).catch(() => false);
+      assert.ok(await rendersMEJ(handoutId), 'entry created via the real sidebar UI did not open through the Enhanced Journal (createDialog race)');
+
+      await player.evaluate((id) => { for (const app of foundry.applications.instances.values()) { if (app.document?.id === id || app.document?.parent?.id === id) app.close(); } }, handoutId);
+      await player.waitForTimeout(500);
+      await player.evaluate(() => { ui.sidebar.expand(); ui.sidebar.changeTab('journal', 'primary'); });
+      const entrySelector = `.directory-item[data-entry-id="${handoutId}"] a[data-action="activateEntry"]`;
+      await player.waitForSelector(entrySelector, { timeout: 15_000 });
+      await player.dblclick(entrySelector);
+      await player.waitForTimeout(2000);
+      assert.ok(await rendersMEJ(handoutId), 'player could not reopen their own handout via a real sidebar dblclick');
+
+      // --- GM "Show to Players" (real header-control action) reaches the player ---
+      await player.evaluate((id) => { for (const app of foundry.applications.instances.values()) { if (app.document?.id === id || app.document?.parent?.id === id) app.close(); } }, handoutId);
+      await player.waitForTimeout(500);
+
+      await gm.evaluate(() => { ui.sidebar.expand(); ui.sidebar.changeTab('journal', 'primary'); });
+      const gmEntrySelector = `.directory-item[data-entry-id="${handoutId}"] a[data-action="activateEntry"]`;
+      await gm.waitForSelector(gmEntrySelector, { timeout: 15_000 });
+      await gm.click(gmEntrySelector);
+      await gm.waitForTimeout(1500);
+
+      // ApplicationV2 collapses every header control beyond Close behind a "..."
+      // (toggleControls) button; the showPlayers control's DOM only exists once
+      // that dropdown has actually been opened. Multiple top-level windows can be
+      // open at once (the EnhancedJournal shell plus a page's own subsheet popout),
+      // each with its own toggle - click the frontmost (highest z-index) one.
+      const toggled = await gm.evaluate(() => {
+        const apps = [...foundry.applications.instances.values()].filter((a) => a.rendered && a.element);
+        apps.sort((a, b) => (parseInt(getComputedStyle(b.element).zIndex) || 0) - (parseInt(getComputedStyle(a.element).zIndex) || 0));
+        for (const app of apps) {
+          const btn = app.element.querySelector('.window-header [data-action="toggleControls"]');
+          if (btn) { btn.click(); return true; }
+        }
+        return false;
+      });
+      assert.ok(toggled, 'no open window had a toggleControls header button for the GM');
+      await gm.waitForTimeout(500);
+
+      const showClicked = await gm.evaluate(() => {
+        const btn = document.querySelector('[data-action="showPlayers"]');
+        if (btn) { btn.click(); return true; }
+        return false;
+      });
+      assert.ok(showClicked, '"Show to Players" header control was not found for the GM');
+      await gm.waitForTimeout(1000);
+
+      // Confirm the real ShowToPlayersDialog (core Journal.showDialog) - pre-fix,
+      // bug (b)'s crash happened before Journal.showDialog was ever called, so this
+      // dialog never appeared at all.
+      const confirmed = await gm.evaluate(() => {
+        const btn = document.querySelector('dialog button[data-action="yes"], dialog button[data-action="ok"], dialog button[type="submit"]');
+        if (btn) { btn.click(); return true; }
+        return false;
+      });
+      assert.ok(confirmed, '"Show to Players" confirmation dialog did not appear - _onShowPlayers likely crashed before calling Journal.showDialog');
+      await player.waitForTimeout(1500);
+
+      // Match either the entry id directly (e.g. a core JournalEntrySheet, or an
+      // EnhancedJournal shell showing a multi-page entry) or a page's parent id
+      // (EnhancedJournal auto-drills a single-page entry into that page - see the
+      // rendersMEJ note above).
+      const playerGotIt = await player.waitForFunction((id) =>
+        [...foundry.applications.instances.values()].some((a) =>
+          a.rendered && (a.document?.id === id || a.document?.parent?.id === id)),
+        handoutId, { timeout: 10_000 }).then(() => true).catch(() => false);
+      assert.ok(playerGotIt, 'player got no window after GM used the real "Show to Players" action');
+    } finally {
+      // Close any windows still showing the entry on EITHER client before deleting
+      // it - deleting out from under a still-open EnhancedJournal tab has been
+      // observed to throw ("A subclass of Document must implement this getter",
+      // apps/enhanced-journal.js renderSubSheet -> document.compendium) from a
+      // pending re-render racing the delete, which is a cleanup-ordering artifact,
+      // not a product bug under test here.
+      if (handoutId) {
+        for (const p of [gm, player]) {
+          await p.evaluate((id) => {
+            for (const app of foundry.applications.instances.values()) {
+              if (app.document?.id === id || app.document?.parent?.id === id) app.close();
+            }
+          }, handoutId).catch(() => {});
+        }
+        await gm.waitForTimeout(300).catch(() => {});
+        await gm.evaluate(async (id) => { await game.journal.get(id)?.delete(); }, handoutId).catch(() => {});
+      }
+      if (grantedJournalCreate) {
+        await gm.evaluate(async (perms) => { await game.settings.set('core', 'permissions', perms); }, originalPermissions).catch(() => {});
+      }
     }
   }
 
