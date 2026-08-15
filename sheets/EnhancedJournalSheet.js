@@ -2365,7 +2365,11 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                                         }
                                         break;
                                     default:
-                                        let text = tableresult.text;
+                                        // TableResult#text is deprecated since v13 (removed v15); mirror core's
+                                        // own back-compat getter (common/documents/table-result.mjs) rather than
+                                        // reading the deprecated accessor: text-type results carry their value in
+                                        // `description`, every other type carries it in `name`.
+                                        let text = (tableresult.type === "text" ? tableresult.description : tableresult.name) || "";
                                         let isCurrencyText = (text.startsWith("{") && text.endsWith("}") && text.length > 2) || (text.startsWith("[[/award") && text.endsWith("]]"));
 
                                         if (isCurrencyText && foundry.utils.getProperty(this.document, "flags.monks-enhanced-journal.type") == 'loot') {
