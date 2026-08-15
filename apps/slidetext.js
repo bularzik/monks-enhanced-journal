@@ -100,18 +100,6 @@ export class SlideText extends HandlebarsApplicationMixin(ApplicationV2) {
         ];
     }
 
-    /*
-    async _onChangeInput(event) {
-        const formData = foundry.utils.expandObject(this._getSubmitData());
-
-        if (Object.keys(formData).length == 0)
-            return;
-
-        foundry.utils.mergeObject(this.tempdata, formData);
-        this.config.refreshText(this.tempdata);
-    }
-    */
-
     static onSubmitForm(event, form, formData) {
         let submitData = foundry.utils.expandObject(formData.object);
         this.options.slideconfig.updateText(this.options.document.id, submitData);

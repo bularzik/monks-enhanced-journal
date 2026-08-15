@@ -171,7 +171,7 @@ export class ProseMirrorPlugin {
 	}
 
 	static async _changeBackgroundPrompt() {
-		const documentUuid = $(this.view.dom).closest("form").attr("entity-uuid");
+		const documentUuid = $(this.view.dom).closest("div[entity-uuid]").attr("entity-uuid");
 		const document = documentUuid ? await fromUuid(documentUuid) : null;
 
 		if (document == null)

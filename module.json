@@ -101,6 +101,8 @@
   ],
   "documentTypes": {
     "JournalEntryPage": {
+      "journalentry": {
+      },
       "encounter": {
         "htmlFields": [
           "description"

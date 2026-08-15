@@ -1336,6 +1336,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     expandSidebar() {
         this._collapsed = false;
+        if (game.user.isGM)
+            game.settings.set("monks-enhanced-journal", "start-collapsed", false);
         $('.enhanced-journal', this.element).removeClass('collapse');
         $('.sidebar-toggle', this.element).attr('data-tooltip', i18n("MonksEnhancedJournal.CollapseDirectory"));
         $('.sidebar-toggle i', this.element).removeClass('fa-caret-left').addClass('fa-caret-right');
@@ -1343,6 +1345,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     collapseSidebar() {
         this._collapsed = true;
+        if (game.user.isGM)
+            game.settings.set("monks-enhanced-journal", "start-collapsed", true);
         $('.enhanced-journal', this.element).addClass('collapse');
         $('.sidebar-toggle', this.element).attr('data-tooltip', i18n("MonksEnhancedJournal.ExpandDirectory"));
         $('.sidebar-toggle i', this.element).removeClass('fa-caret-right').addClass('fa-caret-left');
@@ -1361,13 +1365,13 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             separateWordSearch: false,
             noMatch: function () {
                 if (query != '')
-                    $('.mainbar .navigation .search', that.element).addClass('error');
+                    $('.enhanced-journal-header .navigation .search', that.element).addClass('error');
             },
             done: function (total) {
                 if (query == '')
-                    $('.mainbar .navigation .search', that.element).removeClass('error');
+                    $('.enhanced-journal-header .navigation .search', that.element).removeClass('error');
                 if (total > 0) {
-                    $('.mainbar .navigation .search', that.element).removeClass('error');
+                    $('.enhanced-journal-header .navigation .search', that.element).removeClass('error');
                     let first = $('.editor-parent .editor.editor-display mark:first,.journal-entry-content .scrollable mark:first', that.element);
                     $('.editor', that.element).parent().scrollTop(first.position().top - 10);
                     $('.scrollable', that.element).scrollTop(first.position().top - 10);
@@ -1502,10 +1506,25 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onSubmitForm(formConfig, event) {
-        let form = $("form", this.form).get(0);
-        if (!form) throw new Error("The FormApplication subclass has no registered form element");
-        const formData = new foundry.applications.ux.FormDataExtended(form, { editors: this.editors });
-        await this.subsheet.constructor.onSubmit.call(this.subsheet, event, form, formData);
+        // Fix (Task 8 fix round, sibling of the EnhancedJournalSheet.get form()
+        // crash): this used to search for a <form> nested inside the shell's own
+        // form (this.form) - templates/main.html's tabbed content wrapper WAS a
+        // <form class="content ...">. The maintainer-sync merge took a
+        // non-conflicting maintainer change to that template (<form> -> <div>)
+        // without this matching update, so the nested $("form", ...) lookup has
+        // returned undefined ever since, throwing "The FormApplication subclass
+        // has no registered form element" on every submitOnChange fire (e.g.
+        // editing any text field on an embedded subsheet) and silently dropping
+        // the edit. this.form (DEFAULT_OPTIONS has tag:"form") IS the single
+        // top-level <form> covering the whole shell, including the active
+        // subsheet's content and the header's search field - use it directly
+        // (mirrors the maintainer's own fix for this method) and strip the
+        // search field's value before handing formData to the subsheet, since
+        // it's now part of the same form and isn't a field the subsheet expects.
+        event.preventDefault();
+        const formData = new foundry.applications.ux.FormDataExtended(this.form, { editors: this.editors });
+        delete formData.object.search;
+        await this.subsheet.constructor.onSubmit.call(this.subsheet, event, this.form, formData);
     }
 
     /*
@@ -1711,7 +1730,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         let history = await this.getHistory();
-        this._historycontext = new foundry.applications.ux.ContextMenu(this.element, ".mainbar .navigation .nav-button.history", history, { fixed: true, jQuery: false });
+        this._historycontext = new foundry.applications.ux.ContextMenu(this.element, ".enhanced-journal-header .navigation .nav-button.history", history, { fixed: true, jQuery: false });
         this._imgcontext = new foundry.applications.ux.ContextMenu(this.element, ".journal-body.oldentry .tab.picture", [
             {
                 label: "MonksEnhancedJournal.Delete",

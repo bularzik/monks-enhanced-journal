@@ -788,6 +788,15 @@ body:not(.system-pf2e) .monks-journal-sheet .sheet-container .tag {
     grid-template-columns: 175px 200px auto 45px;
 }
 
+.monks-journal-sheet .relationships .items-list .item-list .item.defunct input,
+.monks-journal-sheet .relationships .items-list .item-list .item.defunct button,
+.monks-journal-sheet .relationships .items-list .item-list .item.defunct img,
+.monks-journal-sheet .relationships .items-list .item-list .item.defunct a:not(.item-delete) {
+    pointer-events: none;
+    opacity: 0.5;
+    user-select: none;
+}
+
 .monks-journal-sheet .offering-list .items-list header,
 .monks-journal-sheet .offering-list .items-list ol {
     grid-template-columns: 120px auto 120px 75px 40px;

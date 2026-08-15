@@ -6,7 +6,7 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
         viewPermission: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE,
         window: {
             resizable: true,
-            contentClasses: ["journal-sheet"]
+            contentClasses: ["journal-sheet", "journal-entry"]
         },
         form: {
             submitOnChange: true
@@ -238,32 +238,36 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
 
     _getEntryContextOptions() {
         const getPage = li => this.entry.pages.get(li.dataset.pageId);
-        return [{
-            label: "SIDEBAR.Edit",
-            icon: "fa-solid fa-pen-to-square",
-            visible: li => this.isEditable && getPage(li)?.canUserModify(game.user, "update"),
-            onClick: (event, li) => getPage(li).sheet.render(true)
-        }, {
-            label: "SIDEBAR.Delete",
-            icon: "fa-solid fa-trash",
-            visible: li => this.isEditable && getPage(li)?.canUserModify(game.user, "delete"),
-            onClick: (event, li) => {
-                const { top, right } = li.getBoundingClientRect();
-                return getPage(li).deleteDialog({ position: { top, left: right } });
-            }
-        }, {
-            label: "SIDEBAR.Duplicate",
-            icon: "fa-regular fa-copy",
-            visible: this.isEditable,
-            onClick: (event, li) => {
-                const page = getPage(li);
-                return page?.clone({ name: game.i18n.format("DOCUMENT.CopyOf", { name: page.name }) }, {
-                    save: true, addSource: true
-                });
-            }
-            }, {
+        return [
+            {
+                label: "SIDEBAR.Edit",
+                icon: 'fa-solid fa-pen-to-square',
+                visible: li => this.isEditable && getPage(li)?.canUserModify(game.user, "update"),
+                onClick: (event, li) => getPage(li).sheet.render(true)
+            },
+            {
+                label: "SIDEBAR.Delete",
+                icon: 'fa-solid fa-trash',
+                visible: li => this.isEditable && getPage(li)?.canUserModify(game.user, "delete"),
+                onClick: (event, li) => {
+                    const { top, right } = li.getBoundingClientRect();
+                    return getPage(li).deleteDialog({ position: { top, left: right } });
+                }
+            },
+            {
+                label: "SIDEBAR.Duplicate",
+                icon: 'fa-regular fa-copy',
+                visible: this.isEditable,
+                onClick: (event, li) => {
+                    const page = getPage(li);
+                    return page?.clone({ name: game.i18n.format("DOCUMENT.CopyOf", { name: page.name }) }, {
+                        save: true, addSource: true
+                    });
+                }
+            },
+            {
                 label: "Extract",
-                icon: "fas fa-file-arrow-down",
+                icon: 'fa-solid fa-file-arrow-down',
                 visible: li => getPage(li)?.isOwner,
                 onClick: async (event, li) => {
                     const page = getPage(li);
@@ -281,28 +285,32 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
                         MonksEnhancedJournal.openJournalEntry(newDoc);
                     }
                 }
-            }, {
-            label: "OWNERSHIP.Configure",
-            icon: "fa-solid fa-lock",
-            visible: game.user.isGM,
-            onClick: (event, li) => {
-                const { top, right } = li.getBoundingClientRect();
-                new foundry.applications.apps.DocumentOwnershipConfig({
-                    document: getPage(li),
-                    position: { top, left: right }
-                }).render({ force: true });
+            },
+            {
+                label: "OWNERSHIP.Configure",
+                icon: 'fa-solid fa-lock',
+                visible: game.user.isGM,
+                onClick: (event, li) => {
+                    const { top, right } = li.getBoundingClientRect();
+                    new foundry.applications.apps.DocumentOwnershipConfig({
+                        document: getPage(li),
+                        position: { top, left: right }
+                    }).render({ force: true });
+                }
+            },
+            {
+                label: "JOURNAL.ActionShow",
+                icon: 'fa-solid fa-eye',    
+                visible: li => getPage(li)?.isOwner,
+                onClick: (event, li) => foundry.documents.collections.Journal.showDialog(getPage(li))
+            },
+            {
+                label: "SIDEBAR.JumpPin",
+                icon: 'fa-solid fa-crosshairs',
+                visible: li => !!getPage(li)?.sceneNote,
+                onClick: (event, li) => canvas.notes.panToNote(getPage(li).sceneNote)
             }
-        }, {
-            label: "JOURNAL.ActionShow",
-            icon: "fa-solid fa-eye",
-            visible: li => getPage(li)?.isOwner,
-            onClick: (event, li) => foundry.documents.collections.Journal.showDialog(getPage(li))
-        }, {
-            label: "SIDEBAR.JumpPin",
-            icon: "fa-solid fa-crosshairs",
-            visible: li => !!getPage(li)?.sceneNote,
-            onClick: (event, li) => canvas.notes.panToNote(getPage(li).sceneNote)
-        }];
+        ];
     }
 
     _initializeApplicationOptions(options) {
