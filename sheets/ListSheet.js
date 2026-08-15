@@ -181,6 +181,12 @@ export class ListSheet extends EnhancedJournalSheet {
         this.tree = this.constructor.setupFolders(this.folders, this.entries);
     }
 
+    render(options = {}) {
+        if (options.reload)
+            this.initialize();
+        super.render(options);
+    }
+
     _documentControls() {
         let ctrls = [
             { id: 'show', label: i18n("MonksEnhancedJournal.ShowToPlayers"), icon: 'fas fa-eye', visible: game.user.isGM, action: "showPlayers" },
@@ -657,7 +663,7 @@ export class ListSheet extends EnhancedJournalSheet {
         return [
             {
                 label: "FOLDER.Edit",
-                icon: '<i class="fas fa-edit"></i>',
+                icon: 'fas fa-edit',
                 visible: game.user.isGM || this.document.isOwner,
                 onClick: (event, header) => {
                     const li = header.parentNode;
@@ -669,7 +675,7 @@ export class ListSheet extends EnhancedJournalSheet {
             },
             {
                 label: "FOLDER.Remove",
-                icon: '<i class="fas fa-trash"></i>',
+                icon: 'fas fa-trash',
                 visible: game.user.isGM || this.document.isOwner,
                 onClick: (event, header) => {
                     const li = header.parentNode;
@@ -692,7 +698,7 @@ export class ListSheet extends EnhancedJournalSheet {
             },
             {
                 label: "FOLDER.Delete",
-                icon: '<i class="fas fa-dumpster"></i>',
+                icon: 'fas fa-dumpster',
                 visible: game.user.isGM || this.document.isOwner,
                 onClick: (event, header) => {
                     const li = header.parentNode;
@@ -721,7 +727,7 @@ export class ListSheet extends EnhancedJournalSheet {
         return [
             {
                 label: i18n("MonksEnhancedJournal.EditItem"),
-                icon: '<i class="fas fa-edit"></i>',
+                icon: 'fas fa-edit',
                 visible: game.user.isGM || this.document.isOwner,
                 onClick: async (event, li) => {
                     const entry = that.entries.find(i => i.id == li.dataset.documentId);
@@ -732,7 +738,7 @@ export class ListSheet extends EnhancedJournalSheet {
             },
             {
                 label: "SIDEBAR.Delete",
-                icon: '<i class="fas fa-trash"></i>',
+                icon: 'fas fa-trash',
                 visible: () => game.user.isGM || this.document.isOwner,
                 onClick: (event, li) => {
                     const entry = that.entries.find(i => i.id == li.dataset.documentId);
@@ -759,7 +765,7 @@ export class ListSheet extends EnhancedJournalSheet {
             },
             {
                 label: "SIDEBAR.Duplicate",
-                icon: '<i class="far fa-copy"></i>',
+                icon: 'fas fa-copy',
                 visible: () => game.user.isGM || this.document.isOwner,
                 onClick: (event, li) => {
                     let entries = (that.document.flags['monks-enhanced-journal'].entries || []);

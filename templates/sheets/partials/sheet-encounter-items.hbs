@@ -65,6 +65,6 @@
         {{/each}}
     </ol>
     {{else}}
-    <div class="instruction">{{#if owner}}{{localize 'MonksEnhancedJournal.msg.DragAnItemToAddToRewards'}}{{else}}{{localize 'MonksEnhancedJournal.msg.NoRewardsAtTheMoment'}}{{/if}}</div>
+    <div class="instruction">{{#if (and owner editable)}}{{localize 'MonksEnhancedJournal.msg.DragAnItemToAddToRewards'}}{{else}}{{localize 'MonksEnhancedJournal.msg.NoRewardsAtTheMoment'}}{{/if}}</div>
     {{/if}}
 </div>

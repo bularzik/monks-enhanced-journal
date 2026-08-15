@@ -64,6 +64,6 @@
         {{> "modules/monks-enhanced-journal/templates/sheets/partials/sheet-reward-items.hbs"}}
     </div>
     {{else}}
-    <div class="instruction">{{#if owner}}{{localize 'MonksEnhancedJournal.msg.NoRewardsPressAddButton'}}{{else}}{{localize 'MonksEnhancedJournal.msg.NoRewardsAtTheMoment'}}{{/if}}</div>
+    <div class="instruction">{{#if (and owner editable)}}{{localize 'MonksEnhancedJournal.msg.NoRewardsPressAddButton'}}{{else}}{{localize 'MonksEnhancedJournal.msg.NoRewardsAtTheMoment'}}{{/if}}</div>
     {{/if}}
 </div>

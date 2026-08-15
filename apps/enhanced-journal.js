@@ -1336,6 +1336,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     expandSidebar() {
         this._collapsed = false;
+        if (game.user.isGM)
+            game.settings.set("monks-enhanced-journal", "start-collapsed", false);
         $('.enhanced-journal', this.element).removeClass('collapse');
         $('.sidebar-toggle', this.element).attr('data-tooltip', i18n("MonksEnhancedJournal.CollapseDirectory"));
         $('.sidebar-toggle i', this.element).removeClass('fa-caret-left').addClass('fa-caret-right');
@@ -1343,6 +1345,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     collapseSidebar() {
         this._collapsed = true;
+        if (game.user.isGM)
+            game.settings.set("monks-enhanced-journal", "start-collapsed", true);
         $('.enhanced-journal', this.element).addClass('collapse');
         $('.sidebar-toggle', this.element).attr('data-tooltip', i18n("MonksEnhancedJournal.ExpandDirectory"));
         $('.sidebar-toggle i', this.element).removeClass('fa-caret-right').addClass('fa-caret-left');
@@ -1361,13 +1365,13 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             separateWordSearch: false,
             noMatch: function () {
                 if (query != '')
-                    $('.mainbar .navigation .search', that.element).addClass('error');
+                    $('.enhanced-journal-header .navigation .search', that.element).addClass('error');
             },
             done: function (total) {
                 if (query == '')
-                    $('.mainbar .navigation .search', that.element).removeClass('error');
+                    $('.enhanced-journal-header .navigation .search', that.element).removeClass('error');
                 if (total > 0) {
-                    $('.mainbar .navigation .search', that.element).removeClass('error');
+                    $('.enhanced-journal-header .navigation .search', that.element).removeClass('error');
                     let first = $('.editor-parent .editor.editor-display mark:first,.journal-entry-content .scrollable mark:first', that.element);
                     $('.editor', that.element).parent().scrollTop(first.position().top - 10);
                     $('.scrollable', that.element).scrollTop(first.position().top - 10);
@@ -1711,7 +1715,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         let history = await this.getHistory();
-        this._historycontext = new foundry.applications.ux.ContextMenu(this.element, ".mainbar .navigation .nav-button.history", history, { fixed: true, jQuery: false });
+        this._historycontext = new foundry.applications.ux.ContextMenu(this.element, ".enhanced-journal-header .navigation .nav-button.history", history, { fixed: true, jQuery: false });
         this._imgcontext = new foundry.applications.ux.ContextMenu(this.element, ".journal-body.oldentry .tab.picture", [
             {
                 label: "MonksEnhancedJournal.Delete",

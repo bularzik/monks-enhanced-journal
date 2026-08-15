@@ -791,6 +791,7 @@ export class MonksEnhancedJournal {
 		let clickCompendiumEntry = async function (wrapped, ...args) {
 			let [event, target] = args;
 			let li = target.closest("[data-entry-id]");
+			if (!li) return wrapped(...args);
 			const document = await this.collection.getDocument(li.dataset.entryId);
 			if (document instanceof JournalEntry) {
 				if (! await MonksEnhancedJournal.openJournalEntry(document, { editable: game.user.isGM && !this.collection.locked })) {
@@ -1439,7 +1440,7 @@ export class MonksEnhancedJournal {
 			context.push({
 				name: "Extract",
 				icon: '<i class="fas fa-file-arrow-down"></i>',
-				condition: li => getPage(li)?.isOwner,
+				visible: li => getPage(li)?.isOwner,
 				callback: async (li) => {
 					const page = getPage(li);
 					if (page) {
@@ -4811,7 +4812,7 @@ Hooks.on("getActorDirectoryEntryContext", (html, entries) => {
 	entries.push({
 		name: i18n("MonksEnhancedJournal.AssignItemsToThisActor"),
 		icon: '<i class="fas fa-suitcase"></i>',
-		condition: li => {
+		visible: li => {
 			return game.user.isGM && (game.modules.get("merchantsheetnpc")?.active || game.modules.get("lootsheetnpc5e")?.active);
 		},
 		callback: async (li) => {
@@ -4833,7 +4834,7 @@ Hooks.on("getJournalDirectoryEntryContext", (html, entries) => {
 	entries.push({
 		name: i18n("MonksEnhancedJournal.AssignItemsToThisLootEntry"),
 		icon: '<i class="fas fa-suitcase"></i>',
-		condition: li => {
+		visible: li => {
 			let id = li.data("entryId");
 			let journal = game.journal.get(id);
 			return game.user.isGM && journal && journal.getFlag('monks-enhanced-journal', 'type') == 'loot';
@@ -5120,6 +5121,27 @@ Hooks.on("renderCompendium", async (app, html, data) => {
 				$(`li[data-document-id="${index._id}"]`, html).prepend($("<img>").addClass("thumbnail").attr("title", index.name).attr("alt", index.name).attr("src", imgFile));
 			}
 		}
+	}
+});
+
+Hooks.on("getJournalEntryContextOptions", (document, menuitems) => {
+	if (document instanceof foundry.applications.sidebar.apps.Compendium && document.documentClass.name == "JournalEntry") {
+		menuitems.push({
+			label: i18n("MonksEnhancedJournal.OpenOutsideEnhancedBrowser"),
+			icon: 'fas fa-link',
+			visible: () => MonksEnhancedJournal.isAllowedToUseEnhancedJournal(),
+			onClick: async (event, li) => {
+				const journal = await document.collection.getDocument(li.dataset.entryId);
+				if (journal) {
+					if (!!MonksEnhancedJournal.getMEJType(journal)) {
+						let page = journal.pages.contents[0];
+						MonksEnhancedJournal.fixType(page);
+						page.sheet.render({ force: true });
+					} else
+						journal.sheet.render({ force: true });
+				}
+			}
+		})
 	}
 });
 
