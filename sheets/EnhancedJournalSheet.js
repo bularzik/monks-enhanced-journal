@@ -134,8 +134,22 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     }
 
     get form() {
+        // Fix (Task 8, "Show to Players" crash): this used to search for a
+        // <form> nested inside the EnhancedJournal shell's own form
+        // element - templates/main.html's tabbed content wrapper WAS a
+        // <form class="content ...">. The maintainer-sync merge took a
+        // non-conflicting maintainer change to that template (<form> ->
+        // <div>) without this matching update, so the nested $("form", ...)
+        // lookup has returned undefined ever since: any subsheet action
+        // that calls this.submit() (e.g. EnhancedJournalSheet._onShowPlayers)
+        // crashes inside core's FormDataExtended#processFormFields
+        // ("Cannot read properties of undefined (reading 'hasAttribute')")
+        // before doing anything, silently eating the action.
+        // this.enhancedjournal.form (its own DEFAULT_OPTIONS has tag:"form")
+        // IS the single top-level <form> that now wraps the whole shell,
+        // including the active subsheet's content - use it directly.
         if (this.enhancedjournal)
-            return $("form", this.enhancedjournal.form).get(0);
+            return this.enhancedjournal.form;
         return super.form;
     }
 
