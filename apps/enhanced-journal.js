@@ -1506,10 +1506,25 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onSubmitForm(formConfig, event) {
-        let form = $("form", this.form).get(0);
-        if (!form) throw new Error("The FormApplication subclass has no registered form element");
-        const formData = new foundry.applications.ux.FormDataExtended(form, { editors: this.editors });
-        await this.subsheet.constructor.onSubmit.call(this.subsheet, event, form, formData);
+        // Fix (Task 8 fix round, sibling of the EnhancedJournalSheet.get form()
+        // crash): this used to search for a <form> nested inside the shell's own
+        // form (this.form) - templates/main.html's tabbed content wrapper WAS a
+        // <form class="content ...">. The maintainer-sync merge took a
+        // non-conflicting maintainer change to that template (<form> -> <div>)
+        // without this matching update, so the nested $("form", ...) lookup has
+        // returned undefined ever since, throwing "The FormApplication subclass
+        // has no registered form element" on every submitOnChange fire (e.g.
+        // editing any text field on an embedded subsheet) and silently dropping
+        // the edit. this.form (DEFAULT_OPTIONS has tag:"form") IS the single
+        // top-level <form> covering the whole shell, including the active
+        // subsheet's content and the header's search field - use it directly
+        // (mirrors the maintainer's own fix for this method) and strip the
+        // search field's value before handing formData to the subsheet, since
+        // it's now part of the same form and isn't a field the subsheet expects.
+        event.preventDefault();
+        const formData = new foundry.applications.ux.FormDataExtended(this.form, { editors: this.editors });
+        delete formData.object.search;
+        await this.subsheet.constructor.onSubmit.call(this.subsheet, event, this.form, formData);
     }
 
     /*

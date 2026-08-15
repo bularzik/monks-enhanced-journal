@@ -148,9 +148,11 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         // this.enhancedjournal.form (its own DEFAULT_OPTIONS has tag:"form")
         // IS the single top-level <form> that now wraps the whole shell,
         // including the active subsheet's content - use it directly.
-        if (this.enhancedjournal)
-            return this.enhancedjournal.form;
-        return super.form;
+        // Adopt the maintainer's exact fallback shape (`?? super.form`, not an
+        // if/return): covers this.enhancedjournal being set but its own .form
+        // resolving falsy, in which case we still want the base-class behavior
+        // rather than returning null/undefined outright.
+        return this.enhancedjournal?.form ?? super.form;
     }
 
     get trueElement() {
