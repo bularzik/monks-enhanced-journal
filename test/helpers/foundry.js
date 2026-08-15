@@ -132,7 +132,7 @@ async function ensureWorld(browser, worldId) {
 // the old session — so we select via direct DOM manipulation (set .value +
 // dispatch 'change') instead of selectOption(), which works regardless of the
 // disabled flag.
-async function join(browser, session, userName) {
+async function join(browser, session, userName, noCanvas = true) {
   const context = await browser.newContext({ viewport: VIEWPORT });
   // Boot this client in "no canvas" mode: MEJ tests only exercise journal
   // sheets (plain DOM), never the scene canvas, but Foundry still
@@ -153,9 +153,21 @@ async function join(browser, session, userName) {
   // `value: new fields.JSONField(...)`). Seed it with addInitScript so it's
   // in place before game.mjs registers the setting and boots /game, on
   // every navigation this context makes (not just the first).
-  await context.addInitScript(() => {
-    window.localStorage.setItem('core.noCanvas', 'true');
-  });
+  //
+  // A caller can opt OUT of noCanvas (pass false) when the feature under
+  // test is itself canvas-dependent (e.g. a MeasuredTemplate placement
+  // preview) — canvas.scene/canvas.stage/canvas.app are only ever populated
+  // by the real Canvas#draw() flow, which core only calls when
+  // canvas.initialized is true (client/game.mjs), which noCanvas prevents
+  // outright (Canvas#initialize() returns before setting anything up). There
+  // is no lighter-weight way to reach that state. Keep such sessions scoped
+  // and short-lived — this is exactly the software-rasterized slow path the
+  // comment above describes.
+  if (noCanvas) {
+    await context.addInitScript(() => {
+      window.localStorage.setItem('core.noCanvas', 'true');
+    });
+  }
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
   const log = [];
@@ -176,22 +188,25 @@ async function join(browser, session, userName) {
   await page.click('button[name="join"]');
   await page.waitForFunction(() => window.game?.ready === true, null, { timeout: 30_000 });
   // Guard against a storage-format mistake silently reverting the
-  // optimization and running the full canvas anyway.
-  const noCanvas = await page.evaluate(() => ({
-    setting: game.settings.get('core', 'noCanvas'),
-    canvasReady: game.canvas?.ready ?? null,
-  }));
-  if (noCanvas.setting !== true || noCanvas.canvasReady) {
-    throw new Error(
-      `core.noCanvas did not take effect for "${userName}" ` +
-      `(setting=${noCanvas.setting}, canvas.ready=${noCanvas.canvasReady}) — ` +
-      `check the localStorage key/value format in join()`
-    );
+  // optimization and running the full canvas anyway (only meaningful when
+  // noCanvas was actually requested).
+  if (noCanvas) {
+    const noCanvasState = await page.evaluate(() => ({
+      setting: game.settings.get('core', 'noCanvas'),
+      canvasReady: game.canvas?.ready ?? null,
+    }));
+    if (noCanvasState.setting !== true || noCanvasState.canvasReady) {
+      throw new Error(
+        `core.noCanvas did not take effect for "${userName}" ` +
+        `(setting=${noCanvasState.setting}, canvas.ready=${noCanvasState.canvasReady}) — ` +
+        `check the localStorage key/value format in join()`
+      );
+    }
   }
   return page;
 }
 
-export async function connect({ world = 'world-a', users = ['Gamemaster'] } = {}) {
+export async function connect({ world = 'world-a', users = ['Gamemaster'], noCanvas = true } = {}) {
   await ensureServer();
   const browser = await chromium.launch();
   const session = {
@@ -202,7 +217,7 @@ export async function connect({ world = 'world-a', users = ['Gamemaster'] } = {}
   };
   try {
     await ensureWorld(browser, world);
-    for (const name of users) session.pages[name] = await join(browser, session, name);
+    for (const name of users) session.pages[name] = await join(browser, session, name, noCanvas);
   } catch (e) {
     await browser.close();
     throw e;
