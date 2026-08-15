@@ -5315,7 +5315,7 @@ Hooks.on("setupTileActions", (app) => {
 				type: "select",
 				subtype: "either",
 				options: { show: ['tagger', 'previous'] },
-				restrict: (entity) => { return (entity instanceof Tile && this.scene.id == entity.parent.id) || this.scene.id == entity.id; },
+				restrict: (entity) => { return (entity instanceof Tile && canvas.scene?.id == entity.parent?.id) || canvas.scene?.id == entity?.id; },
 				required: true
 			},
 			{
