@@ -68,6 +68,17 @@ class BlankJournal extends foundry.abstract.Document {
     get compendium() {
         return null;
     }
+
+    // A registered shell page must remain viewable by non-GM users across re-renders. Document#testUserPermission
+    // (the inherited default) resolves via this.ownership, which BlankJournal's schema doesn't define, so it
+    // always returns NONE - failing the OBSERVER check in EnhancedJournal#_render (~line 494) and causing the
+    // hub (and any other shell page) to be replaced with the "no permission" placeholder for every non-GM on
+    // any non-forced render. Only registered shell pages get this bypass; the plain "blank"/"folder"
+    // placeholders fall through to the inherited (always-NONE) behavior.
+    testUserPermission(user, permission, options) {
+        if (Object.hasOwn(game.MonksEnhancedJournal?.shellPages ?? {}, this.type)) return true;
+        return super.testUserPermission(user, permission, options);
+    }
 }
 export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     tabs = [];
