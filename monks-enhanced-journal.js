@@ -5206,7 +5206,12 @@ Hooks.on("renderCompendium", async (app, html, data) => {
 		for (let index of app.collection.index) {
 			let img = $(`li[data-document-id="${index._id}"] > img.thumbnail`, html);
 			let pagetype = foundry.utils.getProperty(index, "flags.monks-enhanced-journal.pagetype");
-			let imgFile = index.img || foundry.utils.getProperty(index, "flags.monks-enhanced-journal.img") || (pagetype && types[pagetype] != undefined ? `modules/monks-enhanced-journal/assets/${pagetype}.png` : "icons/svg/book.svg");
+			// The built-in asset path below only exists for MEJ's own types; an
+			// externally-registered type (api.registerSheetType) has no such
+			// asset, and pointing img at it would just 404 - same guard as the
+			// preCreateJournalEntry/_onCreate sites (fixes 1437846, f24cbac).
+			let externalType = pagetype && MonksEnhancedJournal.externalTypes[pagetype];
+			let imgFile = index.img || foundry.utils.getProperty(index, "flags.monks-enhanced-journal.img") || (pagetype && types[pagetype] != undefined && !externalType ? `modules/monks-enhanced-journal/assets/${pagetype}.png` : "icons/svg/book.svg");
 			if (img.length) {
 				img.attr("src", imgFile)
 			} else {
