@@ -60,6 +60,14 @@ class BlankJournal extends foundry.abstract.Document {
     _getSheetClass() {
         return (game.MonksEnhancedJournal?.shellPages || {})[this.type]?.appClass;
     }
+
+    // foundry.abstract.Document#compendium is @abstract and throws if not overridden; a real
+    // (non-compendium) document's compendium is null (see ClientDocument#compendium), so returning
+    // null here - never a compendium pack - matches that and keeps callers like
+    // EnhancedJournalSheet#_canUserView's `this.document.compendium` check from throwing.
+    get compendium() {
+        return null;
+    }
 }
 export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     tabs = [];
