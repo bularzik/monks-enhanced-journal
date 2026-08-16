@@ -49,7 +49,7 @@ registerSheetType({ key, moduleId, sheetClass, label, icon, relationships = [] }
 | `icon` | no | A FontAwesome class string (e.g. `"fa-solid fa-scroll"`), used as the fallback tab/type icon when the page's flagged type isn't one of MEJ's built-ins. |
 | `relationships` | no | Array of built-in MEJ type keys (e.g. `["person", "place"]`) your type is allowed to be linked to via MEJ's relationship UI. Defaults to `[]`. |
 
-Internally, `registerSheetType` registers `sheetClass` as the Foundry sheet for **both** `key` and `${moduleId}.${key}` via `DocumentSheetConfig.registerSheet(JournalEntryPage, moduleId, sheetClass, { types: [key, \`${moduleId}.${key}\`], makeDefault: true, label: i18n(label) })`, and merges `label` into `CONFIG.JournalEntryPage.typeLabels`.
+Internally, `registerSheetType` registers `sheetClass` as the Foundry sheet for **both** `key` and `${moduleId}.${key}` via `foundry.applications.apps.DocumentSheetConfig.registerSheet(JournalEntryPage, moduleId, sheetClass, { types: [key, \`${moduleId}.${key}\`], makeDefault: true, label: i18n(label) })`, and merges `label` into `CONFIG.JournalEntryPage.typeLabels`.
 
 The `${moduleId}.${key}` form matters because Foundry auto-namespaces module-declared `documentTypes` subtypes as `${moduleId}.${key}` in the database — that's the real, persisted `type` on the document. MEJ's own `fixType()` logic (see below) coerces the page's in-memory `type` to the bare `key` once it recognizes the page (via the `flags["monks-enhanced-journal"].type` flag), so registering the sheet for both forms covers the page both before and after that coercion runs.
 
@@ -125,6 +125,8 @@ registerShellPage({ id, label, icon, appClass })
 | `label` | no | i18n key or string used as the tab title. |
 | `icon` | no | Accepted but currently **not** wired into tab-icon rendering — MEJ's `getIcon()` only consults `externalTypes[type].icon` (the `registerSheetType` registry), not `shellPages[type].icon`. A shell page's tab currently falls back to MEJ's default icon regardless of this value. |
 
+Unlike `registerSheetType`, `registerShellPage` does **not** throw on a duplicate `id` — it silently overwrites `MonksEnhancedJournal.shellPages[id]`. This matters if your module re-registers on hot-reload: the last call wins with no warning.
+
 `registerShellPage` only registers the page in `MonksEnhancedJournal.shellPages`; it does not open anything. To actually open (or re-activate, if already open) a tab for a registered shell page, call the **static** method on the `MonksEnhancedJournal` class itself — **not** a method on the `api` handle passed into the setup hook:
 
 ```js
@@ -173,7 +175,16 @@ MEJ fires (or defers to) the following hooks that a consumer module can also lis
 MEJ uses document flags under the `monks-enhanced-journal` namespace to track its own state on documents. The two most relevant for integration:
 
 - **`flags["monks-enhanced-journal"].type`** — the MEJ journal type for a page (or, on a `JournalEntry` with a single page, inherited by that page). This is the flag `fixType()` reads to decide what real `type` to coerce a page's in-memory `type` field to. For an externally-registered type, set this flag to the bare `key` you passed to `registerSheetType` (matching what Foundry stores as `${moduleId}.${key}` on disk).
-- **`flags["monks-enhanced-journal"].relationships`** — an array of related-entity references (uuids/ids) used by MEJ's relationship UI on `person`/`place`-family sheets. `EnhancedJournalSheet.allowedRelationships` combines MEJ's built-in relationship types with whatever `externalRelationshipTypes(type)` returns for the current sheet's `type`, i.e. the `relationships` array you passed to `registerSheetType`.
+- **`flags["monks-enhanced-journal"].relationships`** — **an object/map keyed by relationship id**, not an array. Each value is a relationship record, at minimum `{ id, uuid, hidden }` (`id` is the related entry's document id, `uuid` its full uuid, `hidden` whether it's concealed from players); `EnhancedJournalSheet.getRelationships()` (sheets/EnhancedJournalSheet.js:880-891) also transiently decorates entries with display fields (`name`, `img`, `type`, etc.) when building the relationship list for rendering. Example stored shape:
+
+  ```js
+  {
+    "abc123": { id: "abc123", uuid: "JournalEntry.abc123", hidden: false },
+    "def456": { id: "def456", uuid: "JournalEntry.def456", hidden: true }
+  }
+  ```
+
+  A legacy array shape exists from older data: `getRelationships()` detects `relationships instanceof Array`, migrates it into the keyed-object form (keyed by each entry's `.id`), and persists the migrated object back via `setFlag`. Don't write an array to this flag — write (or merge into) the keyed-object form, e.g. via the same read-duplicate-merge-setFlag pattern MEJ itself uses (see `addRelationship()`, sheets/EnhancedJournalSheet.js:3298-3321). `EnhancedJournalSheet.allowedRelationships` combines MEJ's built-in relationship types with whatever `externalRelationshipTypes(type)` returns for the current sheet's `type`, i.e. the `relationships` array you passed to `registerSheetType` — that's a separate, unrelated array (of allowed *type keys*, not relationship records).
 
 Treat both as owned by MEJ: read them, but prefer going through `registerSheetType`/`fixType` rather than writing `flags["monks-enhanced-journal"].type` by hand outside of document creation.
 
@@ -181,13 +192,23 @@ Treat both as owned by MEJ: read them, but prefer going through `registerSheetTy
 
 `MonksEnhancedJournal.fixType(object, settype)` runs on journal pages (and entries) throughout MEJ to reconcile a page's in-memory `type` with its `flags["monks-enhanced-journal"].type` (or its parent entry's, for single-page entries), and to normalize a couple of legacy type aliases (`base`/`oldentry` → `journalentry`, `checklist` → `list`).
 
-If the resolved type isn't one MEJ currently recognizes (i.e. not a built-in type and not in `MonksEnhancedJournal.externalTypes`, which is only populated while the owning module is active and has called `registerSheetType`), `fixType` checks whether the page's real, persisted (`_source`) type looks like a foreign module subtype — i.e. it contains a `.` and doesn't start with `monks-enhanced-journal.`:
+If the resolved type isn't one MEJ currently recognizes (i.e. not a built-in type and not in `MonksEnhancedJournal.externalTypes`, which is only populated while the owning module is active and has called `registerSheetType`), the flag-unsetting logic below runs **only on a GM client** — `else if (game.user.isGM) { ... }`. On that branch, `fixType` checks whether the page's real, persisted (`_source`) type looks like a foreign module subtype — i.e. it contains a `.` and doesn't start with `monks-enhanced-journal.`:
 
 ```js
-let sourceType = object._source?.type ?? "";
-let foreignSubtype = sourceType.includes(".") && !sourceType.startsWith("monks-enhanced-journal.");
-if (!foreignSubtype)
-    object.unsetFlag("monks-enhanced-journal", "type");
+type = type || object.type;
+if (types[type])
+    object.type = type;
+else if (game.user.isGM) {
+    let sourceType = object._source?.type ?? "";
+    let foreignSubtype = sourceType.includes(".") && !sourceType.startsWith("monks-enhanced-journal.");
+    if (!foreignSubtype)
+        object.unsetFlag("monks-enhanced-journal", "type");
+}
 ```
 
-If it *is* a foreign subtype (e.g. `campaign-companion.session`, matching the `${moduleId}.${key}` form Foundry persists for a module-declared `documentTypes` subtype), MEJ leaves the `monks-enhanced-journal` flags alone rather than stripping them. In practice this means: **if the module that owns a custom sheet type is disabled, MEJ will not recognize or render that type, but it also will not delete the flags or otherwise mangle the page's data.** The page's MEJ type flag and content survive untouched, and the page will be recognized correctly again as soon as the owning module is re-enabled and calls `registerSheetType` on the next load.
+The accurate guarantee has two parts:
+
+- **Non-GM clients never touch the flag at all.** The whole unset branch is gated behind `game.user.isGM`, so on a player client an unrecognized type simply falls through without any flag mutation.
+- **GM clients skip unsetting only when the source type is namespaced to another module.** If the page's persisted `_source.type` is a foreign subtype (e.g. `campaign-companion.session`, matching the `${moduleId}.${key}` form Foundry persists for a module-declared `documentTypes` subtype), the GM client leaves `flags["monks-enhanced-journal"].type` alone rather than stripping it. If the source type isn't foreign-namespaced (no `.`, or it does start with `monks-enhanced-journal.`), a GM client *will* unset the flag.
+
+In practice this means: **if the module that owns a custom sheet type is disabled, MEJ will not recognize or render that type, but a GM client will not delete the flag or otherwise mangle the page's data** (and no client will touch it while acting as a non-GM). The page's MEJ type flag and content survive untouched, and the page will be recognized correctly again as soon as the owning module is re-enabled and calls `registerSheetType` on the next load.
