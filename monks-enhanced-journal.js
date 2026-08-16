@@ -997,16 +997,38 @@ export class MonksEnhancedJournal {
 					let pageData = { type: type, name: data.name };
 					let types = MonksEnhancedJournal.getDocumentTypes();
 					if (type == "base" || type == "oldentry") type = "journalentry";
+					// Built-in types are all native `type: "text"` pages with the real
+					// type carried in the monks-enhanced-journal.type flag. Externally
+					// registered types (api.registerSheetType) can be a genuine
+					// module-declared JournalEntryPage subtype instead (e.g. a system
+					// field like campaign companion's Session type, which isn't
+					// text-content-shaped at all) - their real runtime `type` is the
+					// prefixed `<moduleId>.<key>` form (Foundry's module-subtype
+					// convention), not "text". Forcing "text" here would create a page
+					// whose native type doesn't match what the module's own document
+					// schema (and sheet registration, which already listens for both
+					// the bare key and this prefixed form - see getApi's
+					// registerSheetType) expects.
+					let externalType = MonksEnhancedJournal.externalTypes[type];
 					if (types[type]) {
 						foundry.utils.setProperty(pageData, "flags.monks-enhanced-journal.type", type);
 						if (subtype)
 							foundry.utils.setProperty(pageData, "flags.monks-enhanced-journal.subtype", subtype);
-						pageData.type = "text";
+						pageData.type = externalType ? `${externalType.moduleId}.${type}` : "text";
 					}
-					if (types[type])
+					// The built-in asset path below only exists for MEJ's own types;
+					// an external type has no such asset and setting it would just
+					// point `img` at a 404.
+					if (types[type] && !externalType)
 						await document.setFlag("monks-enhanced-journal", "img", `modules/monks-enhanced-journal/assets/${type}.png`);
 					let page = await JournalEntryPage.create(pageData, { parent: document });
-					if (types[type]) {
+					// Only the built-in "text"-with-a-type-flag pages need this
+					// in-memory patch (their real `type` came back as "text"); an
+					// external type's created `page.type` is already the correct
+					// prefixed real type from pageData.type above - overwriting it
+					// with the bare key here would put it right back out of sync with
+					// what was actually created server-side.
+					if (types[type] && !externalType) {
 						page.type = type;
 					}
 				} else {
