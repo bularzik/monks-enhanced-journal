@@ -4483,7 +4483,12 @@ Hooks.on("createJournalEntryPage", (entry, options, userId) => {
 Hooks.on("preCreateJournalEntry", (document, data, options, userId) => {
 	let type = foundry.utils.getProperty(data, "flags.monks-enhanced-journal.pagetype");
 	let types = MonksEnhancedJournal.getDocumentTypes();
-	if (types[type]) {
+	// The built-in asset path below only exists for MEJ's own types; an
+	// externally-registered type (api.registerSheetType) has no such asset,
+	// and stamping it would just point `img` at a 404 - same guard as the
+	// _onCreate site above (fix 1437846).
+	let externalType = MonksEnhancedJournal.externalTypes[type];
+	if (types[type] && !externalType) {
 		let flags = foundry.utils.getProperty(data, "flags.monks-enhanced-journal") || {};
 		flags.img = `modules/monks-enhanced-journal/assets/${type}.png`;
 
