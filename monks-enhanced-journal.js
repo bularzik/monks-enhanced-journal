@@ -102,11 +102,40 @@ export class MonksEnhancedJournal {
 
 	static includedTypes = ["armor", "consumable", "backpack", "equipment", "kit", "treasure", "weapon", "tool", "loot"];
 
+	static externalTypes = {};
+
+	static getApi() {
+		return {
+			registerSheetType: ({ key, moduleId, sheetClass, label, icon, relationships = [] }) => {
+				if (!key || !moduleId || !sheetClass)
+					throw new Error("registerSheetType requires key, moduleId and sheetClass");
+				if (MonksEnhancedJournal.getDocumentTypes()[key])
+					throw new Error(`Journal type '${key}' is already registered`);
+				MonksEnhancedJournal.externalTypes[key] = { moduleId, sheetClass, label, icon, relationships };
+				foundry.applications.apps.DocumentSheetConfig.registerSheet(JournalEntryPage, moduleId, sheetClass, {
+					types: [key, `${moduleId}.${key}`],
+					makeDefault: true,
+					label: i18n(label)
+				});
+				CONFIG.JournalEntryPage.typeLabels = foundry.utils.mergeObject(
+					(CONFIG.JournalEntryPage.typeLabels || {}), { [key]: label });
+			},
+			registerShellPage: () => { throw new Error("registerShellPage: not implemented until Task 2"); }
+		};
+	}
+
+	/** External type keys allowed to relate to the given built-in type. */
+	static externalRelationshipTypes(type) {
+		return Object.entries(MonksEnhancedJournal.externalTypes)
+			.filter(([k, v]) => (v.relationships || []).includes(type))
+			.map(([k, v]) => k);
+	}
+
 	constructor() {
 	}
 
 	static getDocumentTypes() {
-		return {
+		let types = {
 			list: ListSheet,
 			encounter: EncounterSheet,
 			event: EventSheet,
@@ -121,10 +150,13 @@ export class MonksEnhancedJournal {
 			slideshow: SlideshowSheet,
 			journalentry: TextImageEntrySheet
 		};
+		for (let [k, v] of Object.entries(MonksEnhancedJournal.externalTypes))
+			types[k] = v.sheetClass;
+		return types;
 	}
 
 	static getTypeLabels() {
-		return {
+		let labels = {
 			slideshow: "MonksEnhancedJournal.sheettype.slideshow",
 			picture: "MonksEnhancedJournal.sheettype.picture",
 			person: "MonksEnhancedJournal.sheettype.person",
@@ -139,6 +171,9 @@ export class MonksEnhancedJournal {
 			list: "MonksEnhancedJournal.sheettype.list",
 			journalentry: "MonksEnhancedJournal.sheettype.journalentry"
 		};
+		for (let [k, v] of Object.entries(MonksEnhancedJournal.externalTypes))
+			labels[k] = v.label;
+		return labels;
 	}
 
 	static get effectTypes() {
@@ -298,6 +333,8 @@ export class MonksEnhancedJournal {
 		if (currencyAttribute) MonksEnhancedJournal.currencyname = (currencyAttribute === "." ? "" : currencyAttribute);
 
 		game.MonksEnhancedJournal = this;
+
+		Hooks.callAll("setupMonksEnhancedJournal", MonksEnhancedJournal.getApi());
 
 		MonksEnhancedJournal.SOCKET = "module.monks-enhanced-journal";
 
@@ -2860,6 +2897,8 @@ export class MonksEnhancedJournal {
 			case 'poi': return 'fa-map-marker-alt';
 			case 'list': return 'fa-list';
 			default:
+				if (MonksEnhancedJournal.externalTypes[type]?.icon)
+					return MonksEnhancedJournal.externalTypes[type].icon;
 				return 'fa-book-open';
 		}
 	}
@@ -4236,8 +4275,12 @@ export class MonksEnhancedJournal {
 			type = type || object.type;
 			if (types[type])
 				object.type = type;
-			else if (game.user.isGM)
-				object.unsetFlag("monks-enhanced-journal", "type");
+			else if (game.user.isGM) {
+				let sourceType = object._source?.type ?? "";
+				let foreignSubtype = sourceType.includes(".") && !sourceType.startsWith("monks-enhanced-journal.");
+				if (!foreignSubtype)
+					object.unsetFlag("monks-enhanced-journal", "type");
+			}
 
 			return type;
 		} else if (["blank", "folder"].includes(foundry.utils.getProperty(object, "flags.monks-enhanced-journal.type"))) {
