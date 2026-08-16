@@ -103,6 +103,7 @@ export class MonksEnhancedJournal {
 	static includedTypes = ["armor", "consumable", "backpack", "equipment", "kit", "treasure", "weapon", "tool", "loot"];
 
 	static externalTypes = {};
+	static shellPages = {};
 
 	static getApi() {
 		return {
@@ -120,8 +121,30 @@ export class MonksEnhancedJournal {
 				CONFIG.JournalEntryPage.typeLabels = foundry.utils.mergeObject(
 					(CONFIG.JournalEntryPage.typeLabels || {}), { [key]: label });
 			},
-			registerShellPage: () => { throw new Error("registerShellPage: not implemented until Task 2"); }
+			registerShellPage: ({ id, label, icon, appClass }) => {
+				if (!id || !appClass)
+					throw new Error("registerShellPage requires id and appClass");
+				MonksEnhancedJournal.shellPages[id] = { label, icon, appClass };
+			}
 		};
+	}
+
+	/**
+	 * Open (or activate, if already open) a tab hosting a registered shell page.
+	 * Mirrors the create-if-missing / open incantation used by openJournalEntry.
+	 */
+	static async openShellPage(id, options = {}) {
+		let page = MonksEnhancedJournal.shellPages[id];
+		if (!page)
+			return false;
+
+		if (!MonksEnhancedJournal.journal)
+			MonksEnhancedJournal.journal = await (new EnhancedJournal(options)).render(true, options);
+
+		let entity = await MonksEnhancedJournal.journal.findEntity(`shellpage:${id}`, i18n(page.label));
+		MonksEnhancedJournal.journal.open(entity, options.newtab, options);
+
+		return true;
 	}
 
 	/** External type keys allowed to relate to the given built-in type. */
