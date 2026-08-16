@@ -377,7 +377,22 @@ export class ListSheet extends EnhancedJournalSheet {
      }
 
     static onCollapseAll(event, target) {
-        $(target).closest("form").find('li.folder').removeClass("expanded");
+        // Scope to this subsheet's own content, not the shared app-level
+        // <form> - $(target).closest("form") used to land on list.html's own
+        // <form class="journal-subsheet">, but main.html's content wrapper
+        // becoming a <div> means "form" now walks all the way up to the
+        // single top-level <form> wrapping the ENTIRE EnhancedJournal shell
+        // (same root cause as _toggleDisabled's fix above), which also
+        // contains the journal-directory sidebar's own folder tree. That
+        // stripped "expanded" from every sidebar folder any time a List
+        // sheet's Collapse All button was clicked. Mirror _toggleDisabled's
+        // fix: prefer this.trueElement (the sheet instance - static action
+        // handlers are still called with `this` bound to the instance, same
+        // as this.document.id below), falling back to DOM scoping via the
+        // subsheet's own .journal-subsheet wrapper if the instance isn't
+        // reachable for some reason.
+        let scope = this.trueElement ?? target.closest(".journal-subsheet");
+        $(scope).find('li.folder').removeClass("expanded");
         let listFolders = foundry.utils.duplicate(game.user.getFlag('monks-enhanced-journal', 'list-folders') || {});
         delete listFolders[this.document.id];
         game.user.setFlag('monks-enhanced-journal', 'list-folders', listFolders);
