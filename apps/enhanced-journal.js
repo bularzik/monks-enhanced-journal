@@ -526,6 +526,12 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 let first = true;
                 let a;
+                // Foundry v13+'s ApplicationV2 window header has no <a class="close"> -
+                // its close control is <button data-action="close"> - so anchoring on
+                // 'a.close' alone matches nothing and jQuery's insertBefore() on an
+                // empty set silently drops every button. Match either header layout,
+                // and if neither control exists append to the header itself.
+                let closeControl = $('> header a.close, > header [data-action="close"]', this.element).first();
                 for (let btn of buttons) {
                     if ($('> header a.' + btn.class, this.element).length == 0) {   //don't repeat buttons
                         a = $('<a>').addClass(btn.class).addClass('subsheet').toggleClass('first', first)
@@ -534,7 +540,11 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                             .click(event => {
                                 event.preventDefault();
                                 btn.onclick.call(subsheet, event);
-                            }).insertBefore($('> header a.close', this.element));
+                            });
+                        if (closeControl.length)
+                            a.insertBefore(closeControl);
+                        else
+                            a.appendTo($('> header', this.element));
                         first = false;
                     }
                 }
