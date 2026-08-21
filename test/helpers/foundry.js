@@ -62,16 +62,22 @@ async function returnToSetup(browser) {
   page.setDefaultTimeout(TIMEOUT);
   try {
     await page.goto(`${BASE}/join`);
-    await page.waitForSelector('select[name="userid"]');
-    const found = await page.evaluate(() => {
-      const select = document.querySelector('select[name="userid"]');
-      const option = Array.from(select.options).find((o) => o.textContent.trim() === 'Gamemaster');
-      if (!option) return false;
-      select.value = option.value;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-      return true;
-    });
-    if (!found) throw new Error('returnToSetup: no Gamemaster user option on /join');
+    // Build ≤14.365: user <select>; build 14.367+: free-text username <input>.
+    const userField = await page.waitForSelector('select[name="userid"], input[name="username"]');
+    const tagName = await userField.evaluate((el) => el.tagName);
+    if (tagName === 'SELECT') {
+      const found = await page.evaluate(() => {
+        const select = document.querySelector('select[name="userid"]');
+        const option = Array.from(select.options).find((o) => o.textContent.trim() === 'Gamemaster');
+        if (!option) return false;
+        select.value = option.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      });
+      if (!found) throw new Error('returnToSetup: no Gamemaster user option on /join');
+    } else {
+      await page.fill('input[name="username"]', 'Gamemaster');
+    }
     await page.click('button[name="join"]');
     await page.waitForFunction(() => window.game?.ready === true, null, { timeout: 30_000 });
     await page.evaluate(async () => {
@@ -121,8 +127,11 @@ async function ensureWorld(browser, worldId) {
 }
 
 // Log a user in through the join screen in a fresh browser context.
-// Join form: select[name="userid"] (options are user names), input[name="password"],
-// button[name="join"] (templates/setup/parts/join-form.hbs).
+// Join form through build 14.365: select[name="userid"] (options are user
+// names), input[name="password"], button[name="join"]
+// (templates/setup/parts/join-form.hbs). Build 14.367 replaced the user
+// <select> with a free-text input[name="username"] (matched against user
+// names server-side); join() handles both shapes.
 //
 // Correction (recorded from a live DOM dump): the server marks a user's <option>
 // disabled while that user already has a connection open (e.g. a session left
@@ -175,16 +184,21 @@ async function join(browser, session, userName, noCanvas = true) {
   page.on('console', (m) => { if (m.type() === 'error') log.push(`[console.error] ${m.text()}`); });
   page.on('pageerror', (e) => log.push(`[pageerror] ${e.message}`));
   await page.goto(`${BASE}/join`);
-  await page.waitForSelector('select[name="userid"]');
-  const found = await page.evaluate((label) => {
-    const select = document.querySelector('select[name="userid"]');
-    const option = Array.from(select.options).find((o) => o.textContent.trim() === label);
-    if (!option) return false;
-    select.value = option.value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  }, userName);
-  if (!found) throw new Error(`No user option labeled "${userName}" on join screen`);
+  const userField = await page.waitForSelector('select[name="userid"], input[name="username"]');
+  const tagName = await userField.evaluate((el) => el.tagName);
+  if (tagName === 'SELECT') {
+    const found = await page.evaluate((label) => {
+      const select = document.querySelector('select[name="userid"]');
+      const option = Array.from(select.options).find((o) => o.textContent.trim() === label);
+      if (!option) return false;
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }, userName);
+    if (!found) throw new Error(`No user option labeled "${userName}" on join screen`);
+  } else {
+    await page.fill('input[name="username"]', userName);
+  }
   await page.click('button[name="join"]');
   await page.waitForFunction(() => window.game?.ready === true, null, { timeout: 30_000 });
   // Guard against a storage-format mistake silently reverting the
