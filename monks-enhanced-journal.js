@@ -1559,6 +1559,19 @@ export class MonksEnhancedJournal {
 		let onCreateDialog = async function (wrapped, ...args) {
 			let [data, createOptions, options] = args;
 			options.journalentry = true;
+			// Default the dialog's folder select to the folder of the entry
+			// currently open in the MEJ shell, unless the caller already chose
+			// one (the sidebar's per-folder create button passes data.folder).
+			if (!data?.folder) {
+				let shell = game.MonksEnhancedJournal?.journal;
+				let doc = shell?.rendered ? shell.document : null;
+				let entry = doc instanceof JournalEntryPage ? doc.parent : doc;
+				let folderId = entry instanceof JournalEntry ? entry.folder?.id : null;
+				if (folderId) {
+					if (data) data.folder = folderId;
+					else args[0] = { folder: folderId };
+				}
+			}
 			return wrapped(...args);
 		}
 
