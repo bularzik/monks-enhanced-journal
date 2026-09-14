@@ -5,12 +5,12 @@
         <div class="progress-expand" style="display: none;" data-action="expandProgress">{{localize "MonksEnhancedJournal.ShowMore"}}</div>
         {{#unless noprogress}}
         <div class="flexrow progress-container">
-            {{#if @root.owner}}<button type="button" class="progress-button decrease" data-action="updateProgress"><i class="fas fa-minus"></i></button>{{/if}}
+            {{#if @root.owner}}<button type="button" class="progress-button decrease" data-action="updateProgress" data-dblclick-action="ignoreDblClick"><i class="fas fa-minus"></i></button>{{/if}}
             <div class="progress" style="margin-top: 1px;">
                 <div class="progress-bar" style="width:{{percent}}%"></div>
                 <div class="progress-value">{{valueText}}</div>
             </div>
-            {{#if @root.owner}}<button type="button" class="progress-button increase" data-action="updateProgress"><i class="fas fa-plus"></i></button>{{/if}}
+            {{#if @root.owner}}<button type="button" class="progress-button increase" data-action="updateProgress" data-dblclick-action="ignoreDblClick"><i class="fas fa-plus"></i></button>{{/if}}
         </div>
         {{else}}
         {{localize "MonksEnhancedJournal.msg.NoProgressInformation"}}

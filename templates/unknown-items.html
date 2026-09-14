@@ -1,0 +1,14 @@
+<div class="monks-enhanced-journal unknown-items">
+    <h2>Unknown Items</h2>
+    <hr />
+    <p class="notes">The following items could not be identified:</p>
+    <div class="unknown-item-list">
+        <ol class="item-list" style="align-items: center; display: grid; gap: 0.25rem; margin: 0; padding: 2px; position: relative; text-align: left; overflow-y: auto; height: 100%; max-height: 200px; margin: 0px; ">
+            {{#each items}}
+            <li class="item flexrow" data-id="{{this._id}}" style="display: flex;">
+                <div>{{this}}</div>
+            </li>
+            {{/each}}
+        </ol>
+    </div>
+</div>

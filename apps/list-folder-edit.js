@@ -57,7 +57,7 @@ export class ListFolderEdit extends HandlebarsApplicationMixin(ApplicationV2) {
             {
                 type: "submit",
                 icon: "far fa-save",
-                label: "SaveChanges",
+                label: "MonksEnhancedJournal.SaveChanges",
             },
         ];
     }

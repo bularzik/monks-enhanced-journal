@@ -1,6 +1,11 @@
 <div class="slide-showing">
     <div class="duration"></div>
 </div>
+<div class="slide-replay">
+    <p>Slideshow has ended, would you like to play again?</p>
+    <button type="button" data-action="playAgain"><i class="fa-solid fa-play"></i><span>Play Again</span></button>
+</div>
+{{#if this.playControls}}
 <div class="slideshow-body-outer">
     <div class="slideshow-body">
         {{#each slides}}
@@ -21,3 +26,4 @@
         </div>
     </div>
 </div>
+{{/if}}

@@ -163,8 +163,7 @@ export class QuestSheet extends EnhancedJournalSheet {
                         reward.itemIds.push(item._id);
                     }
                 }
-                delete reward.items;
-                reward["-=items"] = null;
+                reward.items = new foundry.data.operators.ForcedDeletion();
                 changed = true;
             }
         }
@@ -439,10 +438,14 @@ export class QuestSheet extends EnhancedJournalSheet {
 
         // Make sure to include all the reward data if you're updating data
         let rewards = foundry.utils.mergeObject(foundry.utils.getProperty(submitData, "flags.monks-enhanced-journal.rewards") || {}, foundry.utils.getProperty(this.document, "flags.monks-enhanced-journal.rewards") || {}, { overwrite: false });
-        foundry.utils.setProperty(submitData, "flags.monks-enhanced-journal.rewards", rewards);
+        if (Object.keys(rewards).length != 0) {
+            foundry.utils.setProperty(submitData, "flags.monks-enhanced-journal.rewards", rewards);
 
-        let reward = rewards[this.getCurrentRewardId()];
-        reward.currency = foundry.utils.getProperty(submitData, "flags.monks-enhanced-journal.currency") || {};
+            let reward = rewards[this.getCurrentRewardId()];
+            if (reward) {
+                reward.currency = foundry.utils.getProperty(submitData, "flags.monks-enhanced-journal.currency") || {};
+            }
+        }
 
         // Make sure to include all the objectives data if you're updating data
         let objectives = foundry.utils.mergeObject(foundry.utils.getProperty(submitData, "flags.monks-enhanced-journal.objectives") || {}, foundry.utils.getProperty(this.document, "flags.monks-enhanced-journal.objectives") || {}, { overwrite: false });
@@ -494,8 +497,7 @@ export class QuestSheet extends EnhancedJournalSheet {
 
         let items = this.document.getFlag('monks-enhanced-journal', 'items') || {};
         for (let itemId of reward.itemIds || []) {
-            delete items[itemId];
-            items[`-=${itemId}`] = null;
+            items[itemId] = new foundry.data.operators.ForcedDeletion();
         }
         await this.document.setFlag('monks-enhanced-journal', 'items', items);
 
@@ -568,10 +570,9 @@ export class QuestSheet extends EnhancedJournalSheet {
         const li = event.target.closest('.item');
 
         const dragData = { from: 'monks-enhanced-journal' };
+        let id = li.dataset.id;
 
         if (li.dataset.document == 'Item') {
-            let id = li.dataset.id;
-
             let reward = this.getReward();
             if (reward == undefined)
                 return;
@@ -798,8 +799,7 @@ export class QuestSheet extends EnhancedJournalSheet {
         reward.itemIds = assignedIds;
         for (let key of Object.keys(rewardItems)) {
             if (!assignedIds.includes(key)) {
-                delete items[key];
-                items[`-=${key}`] = null;
+                items[key] = new foundry.data.operators.ForcedDeletion();
             }
         }
         this.setFlag('monks-enhanced-journal', 'items', items);

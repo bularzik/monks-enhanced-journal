@@ -16,6 +16,12 @@ export let setPrice = (item, name, price) => {
     return MEJHelpers.setPrice(item, name, price);
 }
 
+export let currencyId = (currency) => {
+    if (game.system.id == 'dsa5')
+        return currency?.name;
+    return currency?.id;
+}
+
 export class MEJHelpers {
     static getValue(item, name, defvalue = 0) {
         name = name || pricename();

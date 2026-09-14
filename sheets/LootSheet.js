@@ -255,8 +255,7 @@ export class LootSheet extends EnhancedJournalSheet {
             for (let [key, item] of Object.entries(items)) {
                 let quantity = foundry.utils.getProperty(item, "flags.monks-enhanced-journal.quantity") ?? 0;
                 if (quantity <= 0) {
-                    delete items[key];
-                    items[`-=${key}`] = null;
+                    items[key] = new foundry.data.operators.ForcedDeletion();
                 }
             }
             submitData.flags['monks-enhanced-journal'].items = items;
@@ -328,7 +327,7 @@ export class LootSheet extends EnhancedJournalSheet {
                         let itemQty = getValue(itemData, quantityname(), 1);
                         setValue(itemData, quantityname(), result.quantity * itemQty);
                         let sheet = actor.sheet;
-                        if (sheet._onDropItem)
+                        if (MonksEnhancedJournal.canDropOnActorSheet(sheet))
                             sheet._onDropItem({ preventDefault: () => { }, target: { closest: () => { } } }, itemData );
                         else
                             actor.createEmbeddedDocuments("Item", [itemData]);
@@ -512,7 +511,7 @@ export class LootSheet extends EnhancedJournalSheet {
                 let itemQty = getValue(itemData, quantityname(), 1);
                 setValue(itemData, quantityname(), result.quantity * itemQty);
                 let sheet = actor.sheet;
-                if (sheet._onDropItem)
+                if (MonksEnhancedJournal.canDropOnActorSheet(sheet))
                     sheet._onDropItem({ preventDefault: () => { }, target: { closest: () => { } } }, itemData);
                 else
                     actor.createEmbeddedDocuments("Item", [itemData]);
@@ -563,7 +562,7 @@ export class LootSheet extends EnhancedJournalSheet {
             let itemQty = getValue(itemData, quantityname(), 1);
             setValue(itemData, quantityname(), result.quantity * itemQty);
             let sheet = actor.sheet;
-            if (sheet._onDropItem)
+            if (MonksEnhancedJournal.canDropOnActorSheet(sheet))
                 sheet._onDropItem({ preventDefault: () => { }, target: { closest: () => { } } }, itemData );
             else
                 actor.createEmbeddedDocuments("Item", [itemData]);
@@ -717,8 +716,7 @@ export class LootSheet extends EnhancedJournalSheet {
     removeActor(id) {
         if (id) {
             let actors = foundry.utils.duplicate(this.document.getFlag('monks-enhanced-journal', 'actors') || {});
-            delete actors[id];
-            actors[`-=${id}`] = null;
+            actors[id] = new foundry.data.operators.ForcedDeletion();
             this.document.setFlag('monks-enhanced-journal', 'actors', actors);
         }
     }
@@ -726,20 +724,20 @@ export class LootSheet extends EnhancedJournalSheet {
     _getActorContextOptions() {
         return [
             {
-                name: "Transfer Funds",
-                icon: '<i class="fas fa-user"></i>',
-                condition: () => game.user.isGM,
-                callback: li => {
+                label: "Transfer Funds",
+                icon: 'fas fa-user',
+                visible: () => game.user.isGM,
+                onClick: (event, li) => {
                     const id = li.id;
                     const actor = game.actors.get(id);
                     this.transferCurrency(actor);
                 }
             },
             {
-                name: i18n("MonksEnhancedJournal.RemoveActor"),
-                icon: '<i class="fas fa-trash"></i>',
-                condition: () => game.user.isGM,
-                callback: li => {
+                label: i18n("MonksEnhancedJournal.RemoveActor"),
+                icon: 'fas fa-trash',
+                visible: () => game.user.isGM,
+                onClick: (event, li) => {
                     const id = li.id;
                     foundry.applications.api.DialogV2.confirm({
                         window: {

@@ -2,7 +2,7 @@
 import { CustomisePage } from "../apps/customise-page.js";
 import { EditSound } from "../apps/editsound.js";
 import { MakeOffering } from "../apps/make-offering.js";
-import { getValue, setValue, setPrice, MEJHelpers } from "../helpers.js";
+import { getValue, setValue, setPrice, currencyId, MEJHelpers } from "../helpers.js";
 const { HandlebarsApplicationMixin } = foundry.applications.api
 
 export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.applications.sheets.journal.JournalEntryPageSheet) {
@@ -134,9 +134,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     }
 
     get form() {
-        if (this.enhancedjournal)
-            return $("form", this.enhancedjournal.form).get(0);
-        return super.form;
+        return this.enhancedjournal?.form ?? super.form;
     }
 
     get trueElement() {
@@ -182,7 +180,9 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     _getHeaderControls() {
         if (this.enhancedjournal)
             return [];
-        return this._documentControls().filter(c => !c.type || c.type == "button");
+        let controls = super._getHeaderControls();
+        controls = controls.filter(c => c.action != "configureSheet");
+        return [...controls, ...this._documentControls().filter(c => !c.type || c.type == "button")];
     }
 
     static get defaultObject() {
@@ -476,7 +476,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             let document = await fromUuid(data.uuid);
             this.enhancedjournal.open(document);
         } else if (data.type == 'Item') {
-            this.addItems(data);
+            this.addItem(data);
         } else
             return false;
     }
@@ -549,7 +549,13 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     async subRender(context, options) {
         // Allow the notes to be editable by players even if they can't edit the journal entry
         let hasGM = (game.users.find(u => u.isGM && u.active) != undefined);
-        if (hasGM) {
+        let isEditable = true;
+        if (this.document.pack) {
+            const pack = game.packs.get(this.document.pack);
+            if (pack.locked) isEditable = false;
+        }
+
+        if (hasGM && isEditable) {
             $('.tab.notes .editor-edit', this.trueElement).removeAttr('disabled');
             let editor = $(".notes-container prose-mirror.editor").on("open", (ev) => {
                 editor.get(0).disabled = false;
@@ -728,9 +734,19 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         let results = {};
         for (let [relationshipId, relationship] of Object.entries(relationships)) {
             let entity = relationship.uuid ? await fromUuid(relationship.uuid) : game.journal.get(relationshipId);
-            if (!(entity instanceof JournalEntry || entity instanceof JournalEntryPage))
-                continue;
-            if (entity && entity.testUserPermission(game.user, "LIMITED") && (game.user.isGM || !relationship.hidden)) {
+            if (!(entity instanceof JournalEntry || entity instanceof JournalEntryPage)) {
+                if (game.user.isGM) {
+                    if (!results.defunct)
+                        results.defunct = {
+                            type: "defunct",
+                            name: i18n("MonksEnhancedJournal.Defunct"),
+                            documents: []
+                        };
+
+                    relationship.type = "defunct";
+                    results.defunct.documents.push(relationship);
+                }
+            } else if (entity && entity.testUserPermission(game.user, "LIMITED") && (game.user.isGM || !relationship.hidden)) {
                 let page = (entity instanceof JournalEntryPage ? entity : entity.pages.contents[0]);
                 MonksEnhancedJournal.fixType(page);
                 let type = foundry.utils.getProperty(page, "flags.monks-enhanced-journal.type");
@@ -765,18 +781,18 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     _getDescriptionContextOptions() {
         let menu = [
             {
-                name: "Show in Chat",
-                icon: '<i class="fas fa-comment"></i>',
-                condition: game.user.isGM,
-                callback: () => {
+                label: "Show in Chat",
+                icon: 'fas fa-comment',
+                visible: game.user.isGM,
+                onClick: () => {
                     this.copyToChat();
                 }
             },
             {
-                name: "Extract to Journal Entry",
-                icon: '<i class="fas fa-file-export"></i>',
-                condition: game.user.isGM,
-                callback: () => {
+                label: "Extract to Journal Entry",
+                icon: 'fas fa-file-export',
+                visible: game.user.isGM,
+                onClick: () => {
                     this.constructor.splitJournal.call(this);
                 }
             }
@@ -785,20 +801,20 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         if (game.modules.get("narrator-tools")?.active) {
             menu = menu.concat(
                 [{
-                    icon: '<i class="fas fa-comment"></i>',
-                    name: 'Describe',
-                    condition: game.user.isGM,
-                    callback: () => {
+                    icon: 'fas fa-comment',
+                    label: 'Describe',
+                    visible: game.user.isGM,
+                    onClick: () => {
                         const selection = NarratorTools._getSelectionText();
                         if (selection)
                             NarratorTools.chatMessage.describe(selection);
                     },
                 },
                 {
-                    icon: '<i class="fas fa-comment-dots"></i>',
-                    name: 'Narrate',
-                    condition: game.user.isGM,
-                    callback: () => {
+                    icon: 'fas fa-comment-dots',
+                    label: 'Narrate',
+                    visible: game.user.isGM,
+                    onClick: () => {
                         const selection = NarratorTools._getSelectionText();
                         if (selection)
                             NarratorTools.chatMessage.narrate(selection);
@@ -814,9 +830,9 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         let that = this;
         return [
             {
-                name: "Show Image",
-                icon: '<i class="fas fa-image"></i>',
-                callback: () => {
+                label: "Show Image",
+                icon: 'fas fa-image',
+                onClick: () => {
                     const ip = new foundry.applications.apps.ImagePopout({
                         src: this.document.src,
                         uuid: this.document.uuid,
@@ -830,33 +846,26 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                 }
             },
             {
-                name: "Edit Image",
-                icon: '<i class="fas fa-pencil"></i>',
-                condition: this.document.isOwner,
-                callback: () => {
+                label: "Edit Image",
+                icon: 'fas fa-pencil',
+                visible: this.document.isOwner,
+                onClick: () => {
                     that._onEditImage.call(that);
                 }
             },
             {
-                name: "Clear Image",
-                icon: '<i class="fas fa-trash"></i>',
-                condition: this.document.isOwner,
-                callback: () => {
+                label: "Clear Image",
+                icon: 'fas fa-trash',
+                visible: this.document.isOwner,
+                onClick: () => {
                     foundry.applications.api.DialogV2.confirm({
                         window: {
                             title: `Clear Item`,
                         },
                         content: "Are you sure you want to clear the image?",
                         yes: {
-                            callback: async () => {
-                                await that.document.update({ src: "" });
-                                if (this.constructor.type == "picture") {
-                                    $('img[data-edit="src"],div.picture-img', this.trueElement).css({ opacity: 0 }).attr('src', "").css({ backgroundImage: "" });
-                                    $('.sheet-body .instruction, .tab.picture .instruction', this.trueElement).show();
-                                } else {
-                                    let defaultImage = this.constructor.type == "picture" ? "" : `modules/monks-enhanced-journal/assets/${this.constructor.type}.png`;
-                                    $('img[data-edit="src"],div.picture-img', this.trueElement).attr('src', defaultImage).css({ backgroundImage: defaultImage });
-                                }
+                            callback: () => {
+                                that._onClearImage.call(that);
                             }
                         }
                     });
@@ -868,10 +877,10 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     _getPersonActorContextOptions() {
         return [
             {
-                name: "SIDEBAR.Delete",
-                icon: '<i class="fas fa-trash"></i>',
-                condition: () => game.user.isGM,
-                callback: () => {
+                label: "SIDEBAR.Delete",
+                icon: 'fas fa-trash',
+                visible: () => game.user.isGM,
+                onClick: () => {
                     foundry.applications.api.DialogV2.confirm({
                         window: {
                             title: `${game.i18n.localize("SIDEBAR.Delete")} ${i18n("MonksEnhancedJournal.ActorLink")}`,
@@ -882,10 +891,10 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                 }
             },
             {
-                name: i18n("MonksEnhancedJournal.ImportItems"),
-                icon: '<i class="fas fa-download fa-fw"></i>',
-                condition: () => game.user.isGM && this.document.type == "shop",
-                callback: () => {
+                label: i18n("MonksEnhancedJournal.ImportItems"),
+                icon: 'fas fa-download fa-fw',
+                visible: () => game.user.isGM && this.document.type == "shop",
+                onClick: () => {
                     foundry.applications.api.DialogV2.confirm({
                         window: {
                             title: i18n("MonksEnhancedJournal.ImportAllActorItems"),
@@ -896,17 +905,17 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                 }
             },
             {
-                name: i18n("MonksEnhancedJournal.OpenActorSheet"),
-                icon: '<i class="fas fa-user fa-fw"></i>',
-                condition: () => game.user.isGM,
-                callback: () => {
+                label: i18n("MonksEnhancedJournal.OpenActorSheet"),
+                icon: 'fas fa-user fa-fw',
+                visible: () => game.user.isGM,
+                onClick: () => {
                     this.openActor.call(this, { newtab: true });
                 }
             },
             {
-                name: "Show Image",
-                icon: '<i class="fas fa-image"></i>',
-                callback: () => {
+                label: "Show Image",
+                icon: 'fas fa-image',
+                onClick: () => {
                     let actorLink = this.document.getFlag('monks-enhanced-journal', 'actor');
                     let actor = game.actors.find(a => a.id == actorLink.id);
                     if (!actor)
@@ -926,14 +935,69 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         ];
     }
 
-    _disableFields(form) {
-        super._disableFields(form);
-        let hasGM = (game.users.find(u => u.isGM && u.active) != undefined);
-        if (hasGM) {
-            $('.tab.notes .editor-edit', form).removeAttr('disabled');
-            $(`textarea[name="flags.monks-enhanced-journal.${game.user.id}.notes"]`, form).removeAttr('disabled').removeAttr('readonly').on('blur', this._onChangeInput.bind(this));
+    async submit(submitOptions = {}) {
+        if (this.enhancedjournal) {
+            const formConfig = this.options.form;
+            if (!formConfig?.handler) throw new Error(`The ${this.constructor.name} Application does not support a` + " single top-level form element.");
+            const form = this.form;
+            const event = new SubmitEvent("submit", { cancelable: true });
+            const formData = new foundry.applications.ux.FormDataExtended(form);
+            delete formData.object.search;
+            return formConfig.handler.call(this, event, form, formData, submitOptions);
+        } else {
+            return super.submit(submitOptions);
         }
-        //$('.editor-edit', form).css({ width: '0px !important', height: '0px !important' });
+    }
+
+    _toggleDisabled(disabled) {
+        let hasGM = (game.users.find(u => u.isGM && u.active) != undefined);
+        let isEditable = true;
+        if (this.document.pack) {
+            const pack = game.packs.get(this.document.pack);
+            if (pack.locked) isEditable = false;
+        }
+
+        let element = this.trueElement;
+        element.querySelectorAll("secret-block").forEach(b => b.revealable = !disabled);
+        const form = this.form || this.enhancedjournal?.form;
+        if (!form) return;
+        for (const el of form.elements) {
+            if (element.contains(el)) {
+                if (hasGM && isEditable && $(el).is(`.tab.notes .editor-edit,textarea[name="flags.monks-enhanced-journal.${game.user.id}.notes"]`))
+                    continue;
+                if (el.classList.contains("header-control"))
+                    continue;
+                el.disabled = disabled;
+            }
+        }
+        for (const input of form.querySelectorAll("input[type=image]")) input.disabled = disabled;
+        for (const img of form.querySelectorAll("img[data-edit]")) img.classList.toggle("disabled", disabled);
+        for (const a of element.querySelectorAll(".item-controls a[data-action]")) a.classList.toggle("disabled", disabled);
+    }
+
+    _disableFields(form) {
+        let hasGM = (game.users.find(u => u.isGM && u.active) != undefined);
+        let isEditable = true;
+        if (this.document.pack) {
+            const pack = game.packs.get(this.document.pack);
+            if (pack.locked) isEditable = false;
+        }
+
+        let element = this.trueElement;
+
+        const inputs = ["INPUT", "SELECT", "TEXTAREA", "BUTTON"];
+        for (const i of inputs) {
+            for (const el of form.getElementsByTagName(i)) {
+                if (element.contains(el)) {
+                    if (hasGM && isEditable && $(el).is(`.tab.notes .editor-edit,textarea[name="flags.monks-enhanced-journal.${game.user.id}.notes"]`))
+                        continue;
+                    if (el.classList.contains("header-control"))
+                        continue;
+                    if (i === "TEXTAREA") el.readOnly = true;
+                    else el.disabled = true;
+                }
+            }
+        }
     }
 
     static getCurrency(actor, denomination) {
@@ -1029,11 +1093,11 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         if (value < 0 && setting("purchase-conversion")) {
             let currencies = foundry.utils.duplicate(MonksEnhancedJournal.currencies || []).filter(c => c.convert != undefined);
             for (let curr of currencies) {
-                curr.value = parseInt(this.getCurrency(actor, curr.id) || 0);
+                curr.value = parseInt(this.getCurrency(actor, currencyId(curr)) || 0);
             }
 
-            changes = currencies.reduce((a, v) => ({ ...a, [v.id]: v.value }), {});
-            let denomIdx = currencies.findIndex(c => c.id == denomination);
+            changes = currencies.reduce((a, v) => ({ ...a, [currencyId(v)]: v.value }), {});
+            let denomIdx = currencies.findIndex(c => currencyId(c) == denomination);
             if (denomIdx == -1)
                 return;
 
@@ -1065,7 +1129,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                         remainder -= used;
                         
                         let unused = available - used;
-                        changes[currencies[idx].id] = Math.floor(unused / rate);
+                        changes[currencyId(currencies[idx])] = Math.floor(unused / rate);
                         unused -= Math.floor(unused / rate) * rate;
 
                         if (idx < denomIdx && unused > 0) {
@@ -1074,7 +1138,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                             while (unused > 0 && jdx < currencies.length) {
                                 let r = (currencies[jdx].convert || 1) / (currencies[denomIdx].convert || 1);
                                 let disperse = unused / r;
-                                changes[currencies[jdx].id] += Math.floor(disperse);
+                                changes[currencyId(currencies[jdx])] += Math.floor(disperse);
                                 unused -= Math.floor(disperse) * r;
 
                                 jdx++;
@@ -1089,7 +1153,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             //changes[denomination] += value;
 
             for (let curr of Object.keys(changes)) {
-                let orig = currencies.find(c => c.id == curr);
+                let orig = currencies.find(c => currencyId(c) == curr);
                 if (changes[curr] == orig.value)
                     delete changes[curr];
             }
@@ -1364,6 +1428,17 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         ip.render(true);
     }
 
+    async _onClearImage(event) {
+        await this.document.update({ src: "" });
+        if (this.constructor.type == "picture" || this.constructor.type == "text") {
+            $('img[data-edit="src"],div.picture-img', this.trueElement).css({ opacity: 0 }).attr('src', "").css({ backgroundImage: "" });
+            $('.sheet-body .instruction, .tab.picture .instruction', this.trueElement).show();
+        } else {
+            let defaultImage = this.constructor.type == "picture" ? "" : `modules/monks-enhanced-journal/assets/${this.constructor.type}.png`;
+            $('img[data-edit="src"],div.picture-img', this.trueElement).attr('src', defaultImage).css({ backgroundImage: defaultImage });
+        }
+    }
+
     _onEditImage(event) {
         event?.preventDefault();
         event?.stopPropagation();
@@ -1431,6 +1506,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     }
 
     static onSubmit(event, form, formData) {
+        event.preventDefault();
         let submitData = this._prepareSubmitData(event, form, formData, {})
 
         if (Object.keys(submitData).length == 0)
@@ -1733,7 +1809,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                 itemData.rarity = i18n(CONFIG.PF2E.rarityTraits[item.system?.traits?.rarity]);
             }
 
-            if (game.user.isGM || this.document.isOwner || (item.hide !== true && (flags.quantity !== 0 || setting('show-zero-quantity')))) {
+            if (game.user.isGM || this.document.isOwner || (item.hidden !== true && (flags.quantity !== 0 || setting('show-zero-quantity')))) {
                 let groupId = (!sort || sort == "name" ? this.slugify(item.type) : "");
                 if (groups[groupId] == undefined)
                     groups[groupId] = { id: groupId, name: item.type || "Unknown", items: [] };
@@ -1912,7 +1988,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             }
         };
 
-        ChatMessage.create(messageData, {});
+        foundry.documents.ChatMessage.implementation.create(messageData, {});
     }
 
     static async confirmQuantity(item, max, verb, showTotal = true, price) {
@@ -1995,8 +2071,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                     for (let [key, item] of Object.entries(items)) {
                         let quantity = foundry.utils.getProperty(item, "flags.monks-enhanced-journal.quantity") ?? 0;
                         if (quantity <= 0) {
-                            delete items[key];
-                            items[`-=${key}`] = null;
+                            items[key] = new foundry.data.operators.ForcedDeletion();
                         }
                     }
                     entry.setFlag('monks-enhanced-journal', 'items', items);
@@ -2043,7 +2118,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                 }
             };
 
-            ChatMessage.create(messageData, {});
+            foundry.documents.ChatMessage.implementation.create(messageData, {});
         }
     }
 
@@ -2295,6 +2370,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
 
                         let currency = that.document.getFlag('monks-enhanced-journal', "currency") || {};
                         let currChanged = false;
+                        let unknownItems = [];
 
                         for (let i = 0; i < numberof; i++) {
                             const available = table.results.filter(r => !r.drawn);
@@ -2323,6 +2399,9 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                                         }
                                         break;
                                     default:
+                                        if (!tableresult.name)
+                                            continue;
+
                                         if (foundry.utils.getProperty(this.document, "flags.monks-enhanced-journal.type") == 'loot') {
                                             async function tryRoll(formula) {
                                                 try {
@@ -2332,7 +2411,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                                                 }
                                             }
 
-                                            let text = tableresult.text;
+                                            let text = tableresult.name;
                                             let textCoins = [];
                                             if (text.startsWith("{") && text.endsWith("}") && text.length > 2) {
                                                 let splitStr = (text.indexOf("[") > -1 && text.indexOf("]") > -1) ? "," : " ";
@@ -2354,7 +2433,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                                             }
 
                                             // DND5E Award Enricher Parsing
-                                            if (text.startsWith("[[/award") && text.endsWith("]]")) {
+                                            else if (text.startsWith("[[/award") && text.endsWith("]]")) {
                                                 const awards = text.substring(8, text.length - 2).trim().split(" ");
                                                 for (const part of awards) {
                                                     if (!part) continue;
@@ -2364,37 +2443,27 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                                                 }
                                             }
 
-                                            for (let tc of textCoins) {
-                                                if (tc.coin == undefined)
-                                                    tc.coin = MEJHelpers.defaultCurrency();
-                                                else if (MonksEnhancedJournal.currencies.find(c => c.id == tc.coin) == undefined)
-                                                    continue;
+                                            // Just plain text, create a default item
+                                            else {
+                                                unknownItems.push(text);
+                                            }
 
-                                                tc.coin = tc.coin?.toLowerCase();
+                                            if (textCoins.length) {
+                                                for (let tc of textCoins) {
+                                                    if (tc.coin == undefined)
+                                                        tc.coin = MEJHelpers.defaultCurrency();
+                                                    else if (MonksEnhancedJournal.currencies.find(c => c.id == tc.coin) == undefined)
+                                                        continue;
 
-                                                let value = await tryRoll(tc.formula);
-                                                currency[tc.coin] = (currency[tc.coin] || 0) + value;
-                                                currChanged = true;
+                                                    tc.coin = tc.coin?.toLowerCase();
+
+                                                    let value = await tryRoll(tc.formula);
+                                                    currency[tc.coin] = (currency[tc.coin] || 0) + value;
+                                                    currChanged = true;
+                                                }
                                             }
                                         }
                                 }
-                                /*
-                                if (tableresult.collection === undefined) {
-                                    //check to see if this is a roll for currency
-                                    
-                                } else {
-                                    item = tableresult.collection.get(tableresult.id);
-                                    if (tableresult.collection === "Item") {
-                                        let collection = game.collections.get(tableresult.collection);
-                                        if (collection)
-                                            item = collection.get(tableresult.resultId);
-                                    } else {
-                                        // Try to find it in the compendium
-                                        const items = game.packs.get(tableresult.collection);
-                                        if (items)
-                                            item = await items.getDocument(tableresult.resultId);
-                                    }
-                                }*/
 
                                 if (item) {
                                     if (itemtype == "items" && item instanceof Item) {
@@ -2472,6 +2541,18 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
 
                         if (currChanged)
                             await that.document.setFlag('monks-enhanced-journal', "currency", currency);
+
+                        if (unknownItems.length) {
+                            let content = await foundry.applications.handlebars.renderTemplate("./modules/monks-enhanced-journal/templates/unknown-items.html", { items: unknownItems });
+                            let messageData = {
+                                user: game.user.id,
+                                speaker: ChatMessage.getSpeaker(),
+                                style: CONST.CHAT_MESSAGE_STYLES.OTHER,
+                                content: content,
+                                whisper: [game.user.id],
+                            };
+                            foundry.documents.ChatMessage.implementation.create(messageData, {});
+                        }
                     }
                 }
             },
@@ -2498,11 +2579,15 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     static onDeleteItem(event, target) {
         let item = target.closest('.item');
         let list = target.closest('.item-list');
-        if (item && list)
-            this.deleteItem(item.dataset.id, list.dataset.container);
+        if (item && list) {
+            if (list.dataset.container == "relationships")
+                this.deleteRelationship(item.dataset.id);
+            else
+                this.deleteItem(item.dataset.id, list.dataset.container);
+        }
     }
 
-    async deleteItem(id, container, cascade = true) {
+    async deleteItem(id, container) {
         let data = foundry.utils.duplicate(this.document.flags["monks-enhanced-journal"][container]);
         if (data instanceof Array) {
             data.findSplice(i => i.id == id || i._id == id);
@@ -2510,16 +2595,19 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         } else {
             await this.document.unsetFlag('monks-enhanced-journal', `${container}.${id}`);
         }
+    }
 
-        if (container == "relationships" && cascade) {
-            let journal = game.journal.get(id);
-            if (journal && journal.pages.size > 0) {
-                let page = journal.pages.contents[0];
-                if (journal.isOwner && page.isOwner) {
-                    page.unsetFlag('monks-enhanced-journal', `relationships.${id}`);
-                } else {
-                    MonksEnhancedJournal.emit("deleteRelationship", { uuid: journal.uuid, id: this.document.id, page: this.document.id });
-                }
+    async deleteRelationship(id) {
+        await this.deleteItem(id, "relationships");
+
+        let journal = game.journal.get(id);
+        if (journal && journal.pages.size > 0) {
+            let page = journal.pages.contents[0];
+            let otherId = this.document.parent?.id ?? this.document.id;
+            if (journal.isOwner && page.isOwner) {
+                page.unsetFlag('monks-enhanced-journal', `relationships.${otherId}`);
+            } else {
+                MonksEnhancedJournal.emit("deleteRelationship", { uuid: journal.uuid, id: otherId });
             }
         }
     }
@@ -2586,7 +2674,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
 
                         let itemData = item.toObject();
                         if ((itemData.type === "spell") && game.system.id == 'dnd5e') {
-                            itemData = await EncounterSheet.createScrollFromSpell(itemData);
+                            itemData = await EnhancedJournalSheet.createScrollFromSpell(itemData);
                         }
 
                         let sysPrice = MEJHelpers.getSystemPrice(item, pricename()); //MEJHelpers.getPrice(foundry.utils.getProperty(item, "flags.monks-enhanced-journal.price"));
@@ -2673,25 +2761,6 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             if (items[id]) {
                 items[id].hidden = !items[id].hidden;
                 await this.document.setFlag('monks-enhanced-journal', collection, items);
-            }
-
-            if (collection == "relationships") {
-                // Toggle 
-                let journal;
-                if (li.dataset.uuid) {
-                    journal = await fromUuid(li.dataset.uuid);
-                } else {
-                    journal = game.journal.get(li.dataset.id);
-                }
-                if (journal && (journal instanceof JournalEntryPage || journal.pages.size > 0)) {
-                    let page = journal instanceof JournalEntryPage ? journal : journal.pages.contents[0];
-                    let otherRelationships = foundry.utils.duplicate(foundry.utils.getProperty(page, "flags.monks-enhanced-journal.relationships") || {});
-                    let otherRelationship = Object.values(otherRelationships).find(value => value.uuid == this.document.uuid || value.uuid == this.document.parent.uuid);
-                    if (otherRelationship) {
-                        otherRelationship.hidden = !otherRelationship.hidden;
-                        page.setFlag('monks-enhanced-journal', "relationships", otherRelationships);
-                    }
-                }
             }
         }
     }
@@ -3105,6 +3174,11 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     }
 
     async addRelationship(relationship, cascade = true) {
+        if (this.document.pack) {
+            const pack = game.packs.get(this.document.pack);
+            if (pack.locked) return;
+        }
+
         let entity = await fromUuid(relationship.uuid);
 
         if (!entity)
@@ -3135,9 +3209,9 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                 if (original.isOwner && orgPage.isOwner) {
                     MonksEnhancedJournal.fixType(orgPage);
                     let sheet = orgPage.sheet;
-                    sheet.addRelationship({ id: this.document.parent.id, uuid: this.document.parent.uuid, hidden: true }, false);
+                    await sheet.addRelationship({ id: this.document.parent.id, uuid: this.document.parent.uuid, hidden: relationship.hidden }, false);
                 } else {
-                    MonksEnhancedJournal.emit("addRelationship", { uuid: relationship.uuid, relationship: { id: this.document.parent.id, uuid: this.document.parent.uuid }, page: this.document.id, hidden: true });
+                    MonksEnhancedJournal.emit("addRelationship", { uuid: relationship.uuid, relationship: { id: this.document.parent.id, uuid: this.document.parent.uuid }, hidden: relationship.hidden });
                 }
             }
         }
@@ -3165,7 +3239,8 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         } = itemData.system;
 
         // Get scroll data
-        const scrollUuid = `Compendium.${CONFIG.DND5E.sourcePacks.ITEMS}.${CONFIG.DND5E.spellScrollIds[level]}`;
+        const spellScrollId = CONFIG.DND5E.spellScrollIds[level];
+        const scrollUuid = spellScrollId?.startsWith("Compendium.") ? spellScrollId : `Compendium.${CONFIG.DND5E.sourcePacks.ITEMS}.${spellScrollId}`;
         const scrollItem = await fromUuid(scrollUuid);
         const scrollData = scrollItem.toObject();
         delete scrollData._id;
@@ -3304,7 +3379,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                     MonksEnhancedJournal.emit("refreshDirectory", { name: "journal" });
 
                     //add a new tab but don't switch to it
-                    this.enhancedjournal.addTab(newentry, { activate: false });
+                    await this.enhancedjournal.addTab(newentry, { activate: false });
                     this.enhancedjournal.render();
 
                     //save the current entry and refresh to make sure everything is reset
@@ -3341,7 +3416,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                     content: selectedHTML.html(),
                 };
 
-                ChatMessage.create(messageData, {});
+                foundry.documents.ChatMessage.implementation.create(messageData, {});
             } else
                 ui.notifications.warn(i18n("MonksEnhancedJournal.NothingSelected"));
         } else {
@@ -3536,6 +3611,16 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             }
         }
 
+        for (let [k, v] of Object.entries(offering.currency)) {
+            let currId = currencyId(k);
+
+            if (this.getCurrency(actor, currId) < v) {
+                let currName = MonksEnhancedJournal.currencies.find(c => c.id == k)?.name ?? "coins";
+                ui.notifications.error(`Actor ${actor.name} no longer has enough ${currName}, cannot accept this offering`);
+                return;
+            }
+        }
+
         // If we've made it here then we're good to process this offer
         let destActor;
         let actorLink = this.document.getFlag('monks-enhanced-journal', 'actor');
@@ -3543,9 +3628,9 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             destActor = game.actors.find(a => a.id == actorLink.id);
 
         for (let [k, v] of Object.entries(offering.currency)) {
-            this.addCurrency(actor, k, -v);
+            this.addCurrency(actor, currencyId(k), -v);
             if (destActor)
-                this.addCurrency(destActor, k, v);
+                this.addCurrency(destActor, currencyId(k), v);
         }
 
         for (let item of offering.items) {
@@ -3555,7 +3640,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                 let itemQty = getValue(itemData, quantityname(), 1);
                 setValue(itemData, quantityname(), item.qty * itemQty);
                 let sheet = destActor.sheet;
-                if (sheet._onDropItem)
+                if (MonksEnhancedJournal.canDropOnActorSheet(sheet))
                     sheet._onDropItem({ preventDefault: () => { }, target: { closest: () => { } } }, itemData);
                 else
                     destActor.createEmbeddedDocuments("Item", [itemData]);

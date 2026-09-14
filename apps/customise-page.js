@@ -173,7 +173,7 @@ export class CustomisePage extends HandlebarsApplicationMixin(ApplicationV2) {
             {
                 type: "submit",
                 icon: "far fa-save",
-                label: "Save Changes",
+                label: "MonksEnhancedJournal.SaveChanges",
             }
         ];
     }

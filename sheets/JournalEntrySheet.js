@@ -6,7 +6,7 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
         viewPermission: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE,
         window: {
             resizable: true,
-            contentClasses: ["journal-sheet"]
+            contentClasses: ["journal-sheet", "journal-entry"]
         },
         form: {
             submitOnChange: true
@@ -239,34 +239,38 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
 
     _getEntryContextOptions() {
         const getPage = li => this.entry.pages.get(li.dataset.pageId);
-        return [{
-            name: "SIDEBAR.Edit",
-            icon: '<i class="fa-solid fa-pen-to-square"></i>',
-            condition: li => this.isEditable && getPage(li)?.canUserModify(game.user, "update"),
-            callback: li => getPage(li).sheet.render(true)
-        }, {
-            name: "SIDEBAR.Delete",
-            icon: '<i class="fa-solid fa-trash"></i>',
-            condition: li => this.isEditable && getPage(li)?.canUserModify(game.user, "delete"),
-            callback: li => {
-                const { top, right } = li.getBoundingClientRect();
-                return getPage(li).deleteDialog({ position: { top, left: right } });
-            }
-        }, {
-            name: "SIDEBAR.Duplicate",
-            icon: '<i class="fa-regular fa-copy"></i>',
-            condition: this.isEditable,
-            callback: li => {
-                const page = getPage(li);
-                return page?.clone({ name: game.i18n.format("DOCUMENT.CopyOf", { name: page.name }) }, {
-                    save: true, addSource: true
-                });
-            }
-            }, {
-                name: "Extract",
-                icon: '<i class="fas fa-file-arrow-down"></i>',
-                condition: li => getPage(li)?.isOwner,
-                callback: async (li) => {
+        return [
+            {
+                label: "SIDEBAR.Edit",
+                icon: 'fa-solid fa-pen-to-square',
+                visible: li => this.isEditable && getPage(li)?.canUserModify(game.user, "update"),
+                onClick: (event, li) => getPage(li).sheet.render(true)
+            },
+            {
+                label: "SIDEBAR.Delete",
+                icon: 'fa-solid fa-trash',
+                visible: li => this.isEditable && getPage(li)?.canUserModify(game.user, "delete"),
+                onClick: (event, li) => {
+                    const { top, right } = li.getBoundingClientRect();
+                    return getPage(li).deleteDialog({ position: { top, left: right } });
+                }
+            },
+            {
+                label: "SIDEBAR.Duplicate",
+                icon: 'fa-regular fa-copy',
+                visible: this.isEditable,
+                onClick: (event, li) => {
+                    const page = getPage(li);
+                    return page?.clone({ name: game.i18n.format("DOCUMENT.CopyOf", { name: page.name }) }, {
+                        save: true, addSource: true
+                    });
+                }
+            },
+            {
+                label: "Extract",
+                icon: 'fa-solid fa-file-arrow-down',
+                visible: li => getPage(li)?.isOwner,
+                onClick: async (event, li) => {
                     const page = getPage(li);
                     if (page) {
                         let data = this.document.toObject();
@@ -282,28 +286,32 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
                         MonksEnhancedJournal.openJournalEntry(newDoc);
                     }
                 }
-            }, {
-            name: "OWNERSHIP.Configure",
-            icon: '<i class="fa-solid fa-lock"></i>',
-            condition: game.user.isGM,
-            callback: li => {
-                const { top, right } = li.getBoundingClientRect();
-                new foundry.applications.apps.DocumentOwnershipConfig({
-                    document: getPage(li),
-                    position: { top, left: right }
-                }).render({ force: true });
+            },
+            {
+                label: "OWNERSHIP.Configure",
+                icon: 'fa-solid fa-lock',
+                visible: game.user.isGM,
+                onClick: (event, li) => {
+                    const { top, right } = li.getBoundingClientRect();
+                    new foundry.applications.apps.DocumentOwnershipConfig({
+                        document: getPage(li),
+                        position: { top, left: right }
+                    }).render({ force: true });
+                }
+            },
+            {
+                label: "JOURNAL.ActionShow",
+                icon: 'fa-solid fa-eye',    
+                visible: li => getPage(li)?.isOwner,
+                onClick: (event, li) => Journal.showDialog(getPage(li))
+            },
+            {
+                label: "SIDEBAR.JumpPin",
+                icon: 'fa-solid fa-crosshairs',
+                visible: li => !!getPage(li)?.sceneNote,
+                onClick: (event, li) => canvas.notes.panToNote(getPage(li).sceneNote)
             }
-        }, {
-            name: "JOURNAL.ActionShow",
-            icon: '<i class="fa-solid fa-eye"></i>',
-            condition: li => getPage(li)?.isOwner,
-            callback: li => Journal.showDialog(getPage(li))
-        }, {
-            name: "SIDEBAR.JumpPin",
-            icon: '<i class="fa-solid fa-crosshairs"></i>',
-            condition: li => !!getPage(li)?.sceneNote,
-            callback: li => canvas.notes.panToNote(getPage(li).sceneNote)
-        }];
+        ];
     }
 
     _initializeApplicationOptions(options) {
@@ -567,7 +575,10 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
         const minLevel = Math.min(...headings.map(node => node.level));
         tocNode.querySelector(":scope > ol")?.remove();
         headings = headings.reduce((arr, { text, level, slug, element }) => {
-            if (element) element.dataset.anchor = slug;
+            if (element) {
+                element.dataset.anchor = slug;
+                element.id = slug;
+            }
             if (level < minLevel + 2) arr.push({ text, slug, level: level - minLevel + 2 });
             return arr;
         }, []);
@@ -623,6 +634,7 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
     }
 
     _synchronizeSidebar() {
+        if (!this.trueElement) return;
         const entries = Array.from(this.headingIntersections.values()).sort((a, b) => {
             return a.intersectionRect.y - b.intersectionRect.y;
         });
@@ -630,7 +642,7 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
             const { pageId } = entry.target.closest("[data-page-id]")?.dataset ?? {};
             const anchor = entry.target.dataset.anchor;
             let toc = this.trueElement.querySelector(`.toc [data-page-id="${pageId}"]`);
-            if (anchor) toc = toc.querySelector(`li[data-anchor="${anchor}"]`);
+            if (anchor) toc = toc?.querySelector(`li[data-anchor="${anchor}"]`);
             if (toc) {
                 toc.scrollIntoView();
                 break;
@@ -700,7 +712,7 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
             caption: page?.image.caption,
             window: { title }
         });
-        if (page) ip.shareImage = () => Journal.showDialog(page);
+        if (page) ip.shareImage = () => foundry.documents.collections.Journal.showDialog(page);
         ip.render({ force: true });
     }
 
@@ -1002,7 +1014,7 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
 
     async _onDrop(event) {
         // Retrieve the dropped Journal Entry Page.
-        const data = TextEditor.implementation.getDragEventData(event);
+        const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
         const page = await JournalEntryPage.implementation.fromDropData(data);
         if (!page) return;
 
@@ -1035,7 +1047,7 @@ export class JournalEntrySheet extends EnhancedJournalSheet {
 
     callCloseHooks(pageId) {
         if (foundry.utils.isEmpty(this._pages)) return;
-        const pages = pageId ? [this._pages[pageId]] : Object.values(this._pages);
+        const pages = pageId ? [this._pages["test"]].filter(p => !!p) : Object.values(this._pages);
         for (const page of pages) {
             const sheet = this.getPageSheet(page.id);
             if (sheet.isV2 || sheet.DEFAULT_OPTIONS) sheet._doEvent(sheet._onCloseView, { eventName: "closeView", hookName: "closeView" });

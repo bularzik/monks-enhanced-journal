@@ -26,7 +26,10 @@ export class ListSheet extends EnhancedJournalSheet {
             createItem: ListSheet.onCreateItem,
             editItem: ListSheet.onEditItem,
             toggleFolder: ListSheet.onToggleFolder,
-            collapseAll: ListSheet.onCollapseAll
+            collapseAll: ListSheet.onCollapseAll,
+            ignoreDblClick: (event, target) => {
+                event.preventDefault();
+            },
         },
     };
 
@@ -58,7 +61,7 @@ export class ListSheet extends EnhancedJournalSheet {
     }
 
     get subtype() {
-        return this.document.getFlag("monks-enhanced-journal", "subtype", "basic");
+        return this.document.getFlag("monks-enhanced-journal", "subtype") ?? "basic";
     }
 
     static get defaultObject() {
@@ -181,10 +184,10 @@ export class ListSheet extends EnhancedJournalSheet {
         this.tree = this.constructor.setupFolders(this.folders, this.entries);
     }
 
-    async _render(force = false, options = {}) {
+    render(options = {}) {
         if (options.reload)
             this.initialize();
-        super._render(force, options);
+        super.render(options);
     }
 
     _documentControls() {
@@ -662,10 +665,10 @@ export class ListSheet extends EnhancedJournalSheet {
         let that = this;
         return [
             {
-                name: "FOLDER.Edit",
-                icon: '<i class="fas fa-edit"></i>',
-                condition: game.user.isGM || this.document.isOwner,
-                callback: header => {
+                label: "FOLDER.Edit",
+                icon: 'fas fa-edit',
+                visible: game.user.isGM || this.document.isOwner,
+                onClick: (event, header) => {
                     const li = header.parentNode;
                     const folder = that.folders.find(i => i.id == li.dataset.folderId);
                     if (!folder) return;
@@ -674,10 +677,10 @@ export class ListSheet extends EnhancedJournalSheet {
                 }
             },
             {
-                name: "FOLDER.Remove",
-                icon: '<i class="fas fa-trash"></i>',
-                condition: game.user.isGM || this.document.isOwner,
-                callback: header => {
+                label: "FOLDER.Remove",
+                icon: 'fas fa-trash',
+                visible: game.user.isGM || this.document.isOwner,
+                onClick: (event, header) => {
                     const li = header.parentNode;
                     const folder = that.folders.find(f => f.id == li.dataset.folderId);
                     return foundry.applications.api.DialogV2.confirm({
@@ -697,10 +700,10 @@ export class ListSheet extends EnhancedJournalSheet {
                 }
             },
             {
-                name: "FOLDER.Delete",
-                icon: '<i class="fas fa-dumpster"></i>',
-                condition: game.user.isGM || this.document.isOwner,
-                callback: header => {
+                label: "FOLDER.Delete",
+                icon: 'fas fa-dumpster',
+                visible: game.user.isGM || this.document.isOwner,
+                onClick: (event, header) => {
                     const li = header.parentNode;
                     const folder = that.folders.find(f => f.id == li.data("folderId"));
                     return foundry.applications.api.DialogV2.confirm({
@@ -726,10 +729,10 @@ export class ListSheet extends EnhancedJournalSheet {
         let that = this;
         return [
             {
-                name: i18n("MonksEnhancedJournal.EditItem"),
-                icon: '<i class="fas fa-edit"></i>',
-                condition: game.user.isGM || this.document.isOwner,
-                callback: async (li) => {
+                label: i18n("MonksEnhancedJournal.EditItem"),
+                icon: 'fas fa-edit',
+                visible: game.user.isGM || this.document.isOwner,
+                onClick: async (event, li) => {
                     const entry = that.entries.find(i => i.id == li.dataset.documentId);
                     if (!entry) return;
 
@@ -737,10 +740,10 @@ export class ListSheet extends EnhancedJournalSheet {
                 }
             },
             {
-                name: "SIDEBAR.Delete",
-                icon: '<i class="fas fa-trash"></i>',
-                condition: () => game.user.isGM || this.document.isOwner,
-                callback: li => {
+                label: "SIDEBAR.Delete",
+                icon: 'fas fa-trash',
+                visible: () => game.user.isGM || this.document.isOwner,
+                onClick: (event, li) => {
                     const entry = that.entries.find(i => i.id == li.dataset.documentId);
                     if (!entry) return;
                     return foundry.applications.api.DialogV2.confirm({
@@ -764,10 +767,10 @@ export class ListSheet extends EnhancedJournalSheet {
                 }
             },
             {
-                name: "SIDEBAR.Duplicate",
-                icon: '<i class="far fa-copy"></i>',
-                condition: () => game.user.isGM || this.document.isOwner,
-                callback: li => {
+                label: "SIDEBAR.Duplicate",
+                icon: 'fas fa-copy',
+                visible: () => game.user.isGM || this.document.isOwner,
+                onClick: (event, li) => {
                     let entries = (that.document.flags['monks-enhanced-journal'].entries || []);
                     const original = entries.find(i => i.id == li.dataset.documentId);
                     let newEntry = foundry.utils.duplicate(original);

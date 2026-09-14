@@ -157,7 +157,7 @@ export class ObjectiveDisplay extends HandlebarsApplicationMixin(ApplicationV2) 
     async close(options) {
         if (options?.properClose) {
             super.close(options);
-            MonksEnhancedJournal.objdisp;
+            MonksEnhancedJournal.objdisp = null;
         }
     }
 }

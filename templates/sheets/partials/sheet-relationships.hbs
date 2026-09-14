@@ -13,7 +13,7 @@
                 </header>
             </li>
             {{#each group.documents as |document|}}
-            <li class="item flexrow" data-id="{{document.id}}" data-uuid="{{document.uuid}}" data-document="JournalEntry" draggable="false">
+            <li class="item flexrow{{#if (eq group.type "defunct")}} defunct{{/if}}" data-id="{{document.id}}" data-uuid="{{document.uuid}}" data-document="JournalEntry" draggable="false">
                 <div class="item-name clickable">
                     <img class="item-image large actor-icon" src="{{document.img}}" onerror="if (!this.imgerr) { this.imgerr = true; this.src = 'modules/monks-enhanced-journal/assets/{{document.type}}.png' }" />
                     <div><a data-action="openRelationship">{{#if document.pack}}<i class="fas fa-atlas" data-tooltip="{{localize 'MonksEnhancedJournal.FromCompendium'}}"></i> {{/if}}{{document.name}}</a></div>
@@ -49,7 +49,7 @@
             {{/each}}
         </ol>
         {{else}}
-        <div class="instruction">{{#if owner}}{{localize 'MonksEnhancedJournal.msg.DragToMakeRelationship'}}{{else}}{{localize 'MonksEnhancedJournal.msg.NoRelationshipsAtTheMoment'}}{{/if}}</div>
+        <div class="instruction">{{#if (and owner editable)}}{{localize 'MonksEnhancedJournal.msg.DragToMakeRelationship'}}{{else}}{{localize 'MonksEnhancedJournal.msg.NoRelationshipsAtTheMoment'}}{{/if}}</div>
         {{/if}}
     </div>
 </div>

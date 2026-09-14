@@ -655,7 +655,7 @@ export class ShopSheet extends EnhancedJournalSheet {
             }
         };
 
-        ChatMessage.create(messageData, {});
+        foundry.documents.ChatMessage.implementation.create(messageData, {});
     }
 
     static onClickItem(event, target) {

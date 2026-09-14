@@ -1,0 +1,28 @@
+<div class="currently-playing global-control location-bottom" data-application-part="playing">
+    <header class="slideshow-header">
+        <strong>Currently Playing</strong>
+    </header>
+    <ol class="slideshow-playing plain">
+        <li class="slideshow {{state}}" data-slideshow-id="{{id}}">
+            <header>
+                <i class="fas fa-fw fa-photo-video" inert=""></i>
+                <label class="ellipsis" data-action="openSlideshow">{{name}}</label>
+                <div class="slideshow-controls flexrow">
+                    <button type="button" class="inline-control slideshow-control icon fa-solid fa-play" data-action="slidePlay" data-tooltip="" aria-label="Play Slideshow"></button>
+                    <button type="button" class="inline-control slideshow-control pause icon fa-solid fa-pause" data-action="slidePause" data-tooltip="" aria-label="Pause Slideshow"></button>
+                    <button type="button" class="inline-control slideshow-control icon fa-solid fa-square" data-action="slideStop" data-tooltip="" aria-label="Stop Slideshow"></button>
+                </div>
+            </header>
+
+            <div class="slideshow-playback flexrow">
+                <div class="slide-at">
+                    <span class="current">{{current}}</span>
+                    <span class="sep">/</span>
+                    <span class="total">{{total}}</span>
+                </div>
+                <button type="button" class="inline-control slideshow-control icon fa-solid fa-backward-fast" data-action="slideBack" data-tooltip="" aria-label="Previous Slide"></button>
+                <button type="button" class="inline-control slideshow-control pause icon fa-solid fa-forward-fast" data-action="slideForward" data-tooltip="" aria-label="Next Slide"></button>
+            </div>
+        </li>
+    </ol>
+</div>
