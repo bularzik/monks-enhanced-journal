@@ -1140,6 +1140,7 @@ export class MonksEnhancedJournal {
                 MonksEnhancedJournal.fixType(page);
 				let cls = (page?._getSheetClass ? page._getSheetClass() : null);
 				let sheet = (cls ? new cls({ document: page, render: false }) : null);
+				if (!sheet) return;
 				switch (action) {
 					case "slidePlay":
 						await sheet.playSlideshow();
