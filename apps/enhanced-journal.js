@@ -309,12 +309,14 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         event.stopPropagation(); // Don't trigger other events
         if (event.detail > 1) return; // Ignore repeated clicks
 
-        // A blank tab's document is the BlankJournal placeholder. Core's
-        // DocumentSheetConfig reads CONFIG.JournalEntry.sheetClasses[subtype] for it and
-        // throws "Cannot convert undefined or null to object" on the "blank" subtype -
-        // there is no document to configure, so do nothing (14.01 swapped our own
-        // ApplicationSheetConfig, which tolerated a blank tab, for the core app).
-        if (this.document?.type == "blank") return;
+        // A synthetic tab's document is the BlankJournal placeholder - the built-in
+        // blank/folder tabs and every registered shell page (e.g. the companion's
+        // Campaign Hub). Core's DocumentSheetConfig reads
+        // CONFIG.JournalEntry.sheetClasses[subtype] for it and throws "Cannot convert
+        // undefined or null to object" on those types - there is no document to
+        // configure, so do nothing (14.01 swapped our own ApplicationSheetConfig, which
+        // tolerated a synthetic tab, for the core app).
+        if (isSyntheticType(this.document?.type)) return;
 
         const docSheetConfigWidth = foundry.applications.apps.DocumentSheetConfig.DEFAULT_OPTIONS.position.width;
         this.renderChild(new foundry.applications.apps.DocumentSheetConfig({
@@ -328,8 +330,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _getHeaderControls() {
         let controls = super._getHeaderControls();
-        // ... and don't offer the control at all on a blank tab.
-        if (this.document?.type == "blank")
+        // ... and don't offer the control at all on a synthetic tab.
+        if (isSyntheticType(this.document?.type))
             controls = controls.filter(c => c.action != "configureSheet");
         let sub_controls = this.subsheet?._getHeaderControls?.() || [];
         for (let ctrl of sub_controls) {
