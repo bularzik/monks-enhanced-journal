@@ -3099,7 +3099,7 @@ export class MonksEnhancedJournal {
                 let flags = page.flags['monks-enhanced-journal'] || {};
 
 				let content = await foundry.applications.handlebars.renderTemplate("modules/monks-enhanced-journal/templates/slideshow-currently-playing.html",
-					{ id: journal.id, name: page.name, state: flags.playstate, current: flags.slideAt + 1, total: flags.slides.length });
+					{ id: journal.id, name: page.name, state: flags.playstate, current: flags.slideAt + 1, total: (flags.slides || []).length });
 
 				let current = $("#journal .currently-playing");
 				if (current.length > 0) {
