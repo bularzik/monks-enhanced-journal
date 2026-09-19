@@ -1,3 +1,8 @@
+# 14.09-test (fork)
+- Merged upstream 14.01 (keep-ours-unless-additive; rulings in docs/superpowers/triage/2026-09-18-maintainer-14.01-reconciliation.md).
+- Adopted from 14.01: sidebar Edit opens MEJ-typed entries in the Enhanced Journal; Note Palette no longer trips the note-config hook; list progress +/- ignore double-click; dropping an Actor opens its sheet; Detach/Attach window controls; slideshow Loop fix + Replay; search-bar colours; dnd5e light theme content background.
+- Encounter placement control icon is blank again (maintainer ruling).
+
 # Version 14.01
 
 Updated for Foundry VTT v14 compatibility.  The module now requires v14.
