@@ -103,6 +103,7 @@ export class MonksEnhancedJournal {
 	static includedTypes = ["armor", "consumable", "backpack", "equipment", "kit", "treasure", "weapon", "tool", "loot"];
 
 	static externalTypes = {};
+	static shellPages = {};
 
 	static getApi() {
 		return {
@@ -120,7 +121,30 @@ export class MonksEnhancedJournal {
 				CONFIG.JournalEntryPage.typeLabels = foundry.utils.mergeObject(
 					(CONFIG.JournalEntryPage.typeLabels || {}), { [key]: label });
 			},
+			registerShellPage: ({ id, label, icon, appClass }) => {
+				if (!id || !appClass)
+					throw new Error("registerShellPage requires id and appClass");
+				MonksEnhancedJournal.shellPages[id] = { label, icon, appClass };
+			}
 		};
+	}
+
+	/**
+	 * Open (or activate, if already open) a tab hosting a registered shell page.
+	 * Mirrors the create-if-missing / open incantation used by openJournalEntry.
+	 */
+	static async openShellPage(id, options = {}) {
+		let page = MonksEnhancedJournal.shellPages[id];
+		if (!page)
+			return false;
+
+		if (!MonksEnhancedJournal.journal)
+			MonksEnhancedJournal.journal = await (new EnhancedJournal(options)).render(true, options);
+
+		let entity = await MonksEnhancedJournal.journal.findEntity(`shellpage:${id}`, i18n(page.label));
+		MonksEnhancedJournal.journal.open(entity, options.newtab, options);
+
+		return true;
 	}
 
 	/** External type keys allowed to relate to the given built-in type. */
@@ -5189,7 +5213,12 @@ Hooks.on("renderCompendium", async (app, html, data) => {
 		for (let index of app.collection.index) {
 			let img = $(`li[data-document-id="${index._id}"] > img.thumbnail`, html);
 			let pagetype = foundry.utils.getProperty(index, "flags.monks-enhanced-journal.pagetype");
-			let imgFile = index.img || foundry.utils.getProperty(index, "flags.monks-enhanced-journal.img") || (pagetype && types[pagetype] != undefined ? `modules/monks-enhanced-journal/assets/${pagetype}.png` : "icons/svg/book.svg");
+			// The built-in asset path below only exists for MEJ's own types; an
+			// externally-registered type (api.registerSheetType) has no such
+			// asset, and pointing img at it would just 404 - same guard as the
+			// preCreateJournalEntry/_onCreate sites (fixes 1437846, f24cbac).
+			let externalType = pagetype && MonksEnhancedJournal.externalTypes[pagetype];
+			let imgFile = index.img || foundry.utils.getProperty(index, "flags.monks-enhanced-journal.img") || (pagetype && types[pagetype] != undefined && !externalType ? `modules/monks-enhanced-journal/assets/${pagetype}.png` : "icons/svg/book.svg");
 			if (img.length) {
 				img.attr("src", imgFile)
 			} else {
