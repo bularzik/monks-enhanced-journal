@@ -1162,7 +1162,11 @@ export class MonksEnhancedJournal {
 				}
             } else
                 return wrapped(...args);
-		});
+			// MIXED, not patchFunc's default WRAPPER: the slideshow-control branch above
+			// deliberately handles the action itself and never chains, which libWrapper
+			// treats as an API violation for a WRAPPER - it unregisters the patch after the
+			// first such click, so every later Currently Playing control silently did nothing.
+		}, "MIXED");
 
 		patchFunc("foundry.applications.ux.ProseMirrorEditor.prototype._handleAutosave", function (wrapped, ...args) {
 			if (!this.options.document?._sheet)
