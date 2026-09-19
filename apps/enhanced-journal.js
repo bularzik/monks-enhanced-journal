@@ -309,6 +309,13 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         event.stopPropagation(); // Don't trigger other events
         if (event.detail > 1) return; // Ignore repeated clicks
 
+        // A blank tab's document is the BlankJournal placeholder. Core's
+        // DocumentSheetConfig reads CONFIG.JournalEntry.sheetClasses[subtype] for it and
+        // throws "Cannot convert undefined or null to object" on the "blank" subtype -
+        // there is no document to configure, so do nothing (14.01 swapped our own
+        // ApplicationSheetConfig, which tolerated a blank tab, for the core app).
+        if (this.document?.type == "blank") return;
+
         const docSheetConfigWidth = foundry.applications.apps.DocumentSheetConfig.DEFAULT_OPTIONS.position.width;
         this.renderChild(new foundry.applications.apps.DocumentSheetConfig({
             document: this.document,
@@ -321,6 +328,9 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _getHeaderControls() {
         let controls = super._getHeaderControls();
+        // ... and don't offer the control at all on a blank tab.
+        if (this.document?.type == "blank")
+            controls = controls.filter(c => c.action != "configureSheet");
         let sub_controls = this.subsheet?._getHeaderControls?.() || [];
         for (let ctrl of sub_controls) {
             ctrl.onClick = (event) => this._handleContextClick(event, ctrl.action);
