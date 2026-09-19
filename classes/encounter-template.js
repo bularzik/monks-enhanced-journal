@@ -100,7 +100,7 @@ export class EncounterTemplate extends foundry.canvas.placeables.MeasuredTemplat
     async _draw(options) {
         await super._draw(options);
 
-        this.controlIcon.texture = "icons/svg/sword.svg";
+        this.controlIcon.texture = null;
         await this.controlIcon.draw();
     }
 
