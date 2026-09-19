@@ -3338,9 +3338,11 @@ export class MonksEnhancedJournal {
 			return false;
 
 		let background = '';
-		if (slide.background?.color == '')
-			background = `background-image:url(\'${slide.img}\');`;
-		else
+		if (slide.background?.color == '') {
+			// No image means no background-image: `url('undefined')` is a real request.
+			if (slide.img)
+				background = `background-image:url(\'${slide.img}\');`;
+		} else
 			background = `background-color:${slide.background?.color}`;
 
 		let windowSize = 25;
@@ -3375,9 +3377,17 @@ export class MonksEnhancedJournal {
 
 		let tag = foundry.helpers.media.VideoHelper.hasVideoExtension(slide.img) ? "<video>" : "<img>";
 
+		// A slide with no image must not request `undefined` from the server: an
+		// src="undefined" attribute fires a 404 on every client that renders the slide.
+		// 14.01's renderSlideshowSheet fix (sheet.object -> sheet.document) made this
+		// path reachable for non-owners, which is where the stray request showed up.
+		let imgAttrs = { 'loop': true, 'autoplay': "true" };
+		if (slide.img)
+			imgAttrs.src = slide.img;
+
 		return $('<div>').addClass("slide animate-slide loading").attr('data-slide-id', slide.id)
 			.append($('<div>').addClass('slide-background').append($('<div>').attr('style', background)))
-			.append($(tag).addClass('slide-image').attr({ 'src': slide.img, 'loop': true, 'autoplay': "true" }).css({ 'object-fit': slide.sizing}))
+			.append($(tag).addClass('slide-image').attr(imgAttrs).css({ 'object-fit': slide.sizing}))
 			.append(textarea);
 	}
 
