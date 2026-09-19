@@ -220,7 +220,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         const frame = await super._renderFrame(options);
         if (!this.hasFrame) return frame;
 
-        const copyLabel = game.i18n.localize("SHEETS.CopyUuid");
+        const copyLabel = game.i18n.localize("APPLICATION.ACTIONS.CopyUuid");
         const copyId = `
     <button type="button" class="header-control fa-solid fa-passport icon" data-action="copyUuid"
             data-tooltip="${copyLabel}" aria-label="${copyLabel}"></button>
@@ -309,24 +309,37 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         event.stopPropagation(); // Don't trigger other events
         if (event.detail > 1) return; // Ignore repeated clicks
 
-        new ApplicationSheetConfig({
-            type: "enhancedjournal",
+        const docSheetConfigWidth = foundry.applications.apps.DocumentSheetConfig.DEFAULT_OPTIONS.position.width;
+        this.renderChild(new foundry.applications.apps.DocumentSheetConfig({
+            document: this.document,
             position: {
                 top: this.position.top + 40,
-                left: this.position.left + ((this.position.width - 500) / 2)
+                left: this.position.left + ((this.position.width - docSheetConfigWidth) / 2)
             }
-        }).render({ force: true });
+        }));
     }
 
     _getHeaderControls() {
-        let controls = (this.options.window.controls || []).filter(c => c.action === "configureSheet").concat(this.subsheet?._getHeaderControls?.() || []);
+        let controls = super._getHeaderControls();
+        let sub_controls = this.subsheet?._getHeaderControls?.() || [];
+        for (let ctrl of sub_controls) {
+            ctrl.onClick = (event) => this._handleContextClick(event, ctrl.action);
+        }
         let maximized = this.element?.classList.contains("maximized");
-        return controls.concat([{
+        return [...controls, ...sub_controls, {
             icon: maximized ? "fas fa-compress-arrows-alt" : "fas fa-expand-arrows-alt",
             label: maximized ? "MonksEnhancedJournal.Restore" : "MonksEnhancedJournal.Maximize",
             action: "toggleMaximize",
             visible: true
-        }]);
+        }];
+    }
+
+    _handleContextClick(event, action) {
+        let handler = this.subsheet.actions[action];
+
+        if (handler) {
+            handler.call(this.subsheet, event, event.target);
+        }
     }
 
     get entryType() {
@@ -616,9 +629,17 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             $('.window-title', this.element).html((subsheet.title || i18n("MonksEnhancedJournal.NewTab")) + ' - ' + i18n("MonksEnhancedJournal.AppName"));
 
             if (subsheet._createDocumentIdLink)
-                subsheet._createDocumentIdLink(subsheetElement)
+                subsheet._createDocumentIdLink(subsheetElement);
 
-            $('.content', this.element).attr('entity-type', this.document.type).attr('entity-id', this.document.id).attr('entity-uuid', this.document.uuid);
+            const { colorScheme } = game.settings.get("core", "uiConfig");
+            const { defaults, documents } = game.settings.get("core", "sheetThemes");
+            let sheetTheme = (documents || {})[this.document.uuid] || (defaults || {}).JournalEntry?.base || colorScheme.applications || "dark";
+
+            $('.content', this.element)
+                .attr('entity-type', this.document.type)
+                .attr('entity-id', this.document.id)
+                .attr('entity-uuid', this.document.uuid)
+                .addClass(`themed theme-${sheetTheme}`);
             if (game.system.id == "pf2e") {
                 // pf2e's own CSS scopes trait/tag styling behind a `.journal-entry-page .journal-page-content` descendant
                 // selector. In the standalone/windowed path (EnhancedJournalSheet#_onRender) this ancestor class lands
@@ -745,7 +766,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _saveScrollPositions(html) {
         super._saveScrollPositions(html);
-        if (this.subsheet && this.subsheet.rendered && this.subsheet.options.scrollY && this.subsheet.object.id == this.document.id) {   //only save if we're refreshing the sheet
+        if (this.subsheet && this.subsheet.rendered && this.subsheet.options.scrollY && this.subsheet.document.id == this.document.id) {   //only save if we're refreshing the sheet
             const selectors = this.subsheet.options.scrollY || [];
 
             this._scrollPositions = selectors.reduce((pos, sel) => {
@@ -761,7 +782,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     saveScrollPos() {
-        if (this?.subsheet && this.subsheet.options.scrollY && this.subsheet.object.id == this.document.id) {   //only save if we're refreshing the sheet
+        if (this?.subsheet && this.subsheet.options.scrollY && this.subsheet.document.id == this.document.id) {   //only save if we're refreshing the sheet
             const selectors = this.subsheet.options.scrollY || [];
 
             let newScrollPositions = selectors.reduce((pos, sel) => {
@@ -805,7 +826,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             for (let ctrl of ctrls) {
                 if (ctrl.visible != undefined) {
                     if (typeof ctrl.visible == 'function') {
-                        if (!ctrl.visible.call(this.subsheet, this.subsheet.object))
+                        if (!ctrl.visible.call(this.subsheet, this.subsheet.document))
                             continue;
                     }
                     else if (!ctrl.visible)
@@ -1067,13 +1088,6 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
             tab.entity = await this.findEntity(tab.entityId, tab.text);
         }
 
-        /*
-        if (currentTab?.id == tab.id) {
-            this.display(tab.entity);
-            this.updateHistory();
-            return false;
-        }*/
-
         if (currentTab != undefined)
             currentTab.active = false;
         tab.active = true;
@@ -1081,16 +1095,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this._tabs)
             this._tabs.active = null;
 
-        //$('.back-button', this.element).toggleClass('disabled', !this.canBack(tab));
-        //$('.forward-button', this.element).toggleClass('disabled', !this.canForward(tab));
-
-        //$(`.journal-tab[data-tabid="${tab.id}"]`, this.element).addClass('active').siblings().removeClass('active');
-
-        //this.display(tab.entity);
-
         this.saveTabs();
 
-        //this.updateHistory();
         if (this.rendered)
             await this.render(true, options);
         else {
@@ -1412,8 +1418,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     expandSidebar() {
         this._collapsed = false;
-        if (game.user.isGM)
-            game.settings.set("monks-enhanced-journal", "start-collapsed", false);
+        game.settings.set("monks-enhanced-journal", "start-collapsed", false);
         $('.enhanced-journal', this.element).removeClass('collapse');
         $('.sidebar-toggle', this.element).attr('data-tooltip', i18n("MonksEnhancedJournal.CollapseDirectory"));
         $('.sidebar-toggle i', this.element).removeClass('fa-caret-left').addClass('fa-caret-right');
@@ -1421,8 +1426,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     collapseSidebar() {
         this._collapsed = true;
-        if (game.user.isGM)
-            game.settings.set("monks-enhanced-journal", "start-collapsed", true);
+        game.settings.set("monks-enhanced-journal", "start-collapsed", true);
         $('.enhanced-journal', this.element).addClass('collapse');
         $('.sidebar-toggle', this.element).attr('data-tooltip', i18n("MonksEnhancedJournal.ExpandDirectory"));
         $('.sidebar-toggle i', this.element).removeClass('fa-caret-right').addClass('fa-caret-left');
@@ -1504,7 +1508,6 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onDrop(event) {
-        log('enhanced journal drop', event);
         let result = $(event.currentTarget).hasClass('enhanced-journal-header') ? false : this.subsheet._onDrop(event);
 
         if (result instanceof Promise)
@@ -1568,7 +1571,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                 if (data.pack == undefined) {
                     let actor = await fromUuid(data.uuid);
                     if (actor && actor instanceof Actor)
-                        this.open(actor, setting("open-new-tab"));
+                        actor.sheet.render(true, { focus: true });
                 }
             } else if (data.type == 'JournalEntry') {
                 let entity = await fromUuid(data.uuid);
@@ -1676,7 +1679,7 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _createContextMenus(html) {
-        this._context = new foundry.applications.ux.ContextMenu(html, ".bookmark-button", [
+        this._context = new foundry.applications.ux.ContextMenu(html, ".bookmark-button:not(.add-bookmark)", [
             {
                 label: "Open outside Enhanced Journal",
                 icon: "fas fa-file-export",

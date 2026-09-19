@@ -3,6 +3,10 @@
     border-bottom: none;
 }
 
+body.system-dnd5e .monks-enhanced-journal .content.themed.theme-light .journal-entry-content {
+    --mej-sheet-content-background: url(../../../systems/dnd5e/ui/texture1.webp) no-repeat top center / auto 770px, #f1ebe8 url(../../../systems/dnd5e/ui/texture2.webp) no-repeat bottom center / auto 704px;
+}
+
 .monks-enhanced-journal.dnd5e2.journal-entry-page.application.titlebar .window-title {
     visibility: visible;
 }

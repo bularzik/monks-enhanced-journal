@@ -26,7 +26,10 @@ export class ListSheet extends EnhancedJournalSheet {
             createItem: ListSheet.onCreateItem,
             editItem: ListSheet.onEditItem,
             toggleFolder: ListSheet.onToggleFolder,
-            collapseAll: ListSheet.onCollapseAll
+            collapseAll: ListSheet.onCollapseAll,
+            ignoreDblClick: (event, target) => {
+                event.preventDefault();
+            },
         },
     };
 

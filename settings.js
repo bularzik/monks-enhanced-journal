@@ -285,7 +285,7 @@ export const registerSettings = function () {
 	game.settings.register(modulename, "start-collapsed", {
 		name: i18n("MonksEnhancedJournal.start-collapsed.name"),
 		hint: i18n("MonksEnhancedJournal.start-collapsed.hint"),
-		scope: "world",
+		scope: "client",
 		config: true,
 		default: false,
 		type: Boolean,

@@ -152,11 +152,12 @@ export class SlideConfig extends HandlebarsApplicationMixin(ApplicationV2) {
 
         $('.slide-text', this.element).each(function () {
             let text = texts.find(t => t.id == this.dataset.id);
-            let pos = $(this).position();
-            text.left = (pos.left / 600) * 100;
-            text.top = (pos.top / 400) * 100;
-            text.right = ((600 - (pos.left + $(this).outerWidth())) / 600) * 100;
-            text.bottom = ((400 - (pos.top + $(this).outerHeight())) / 400) * 100;
+            let elem_left = parseFloat($(this).css("left").replace("px", ""));
+            let elem_top = parseFloat($(this).css("top").replace("px", ""));
+            text.left = (elem_left / 600) * 100;
+            text.top = (elem_top / 400) * 100;
+            text.right = ((600 - (elem_left + $(this).outerWidth())) / 600) * 100;
+            text.bottom = ((400 - (elem_top + $(this).outerHeight())) / 400) * 100;
             text.text = $(this).val();
         });
 

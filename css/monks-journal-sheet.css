@@ -1274,6 +1274,10 @@ body:not(.system-pf2e) .monks-journal-sheet .sheet-container .tag {
     display: flex;
 }
 
+.monks-journal-sheet .picture-section .instruction {
+    position: absolute;
+    top: 0px;
+}
 /* Blank */
 .monks-journal-sheet.sheet.blank {
     justify-content: center;
@@ -1538,7 +1542,7 @@ body:not(.system-pf2e) .monks-journal-sheet .sheet-container .tag {
     position: relative;
     flex-wrap: nowrap;
 }
-.monks-journal-sheet .list-list .progress div {
+.monks-journal-sheet .list-list .progress div.progress-value {
     margin: 0px;
 }
 .monks-journal-sheet .list-list .progress:first-child {
@@ -2012,7 +2016,7 @@ body:not(.system-pf2e) .monks-journal-sheet .sheet-container .tag {
     color: var(--mej-sheet-color);
 }
 
-.monks-journal-sheet .slideshow-container .slide-details input:not([type="checkbox"]),
+.monks-journal-sheet .slideshow-container .slide-details input:not([type="checkbox"]):not([type="range"]),
 .monks-journal-sheet .slideshow-container .slide-details select {
     height: var(--form-field-height);
     font-size: var(--font-size-14);
@@ -2025,6 +2029,23 @@ body:not(.system-pf2e) .monks-journal-sheet .sheet-container .tag {
     flex: 0 0 24px;
     line-height: 24px;
     margin: -1px 0 -1px 4px;
+}
+.monks-journal-sheet .slideshow-container .slide-details file-picker {
+    background: transparent;
+    border: transparent;
+}
+.monks-journal-sheet .slideshow-container .slide-details file-picker button {
+    background: var(--input-background-color);
+    border: 1px solid var(--input-border-color);
+    border-radius: 4px;
+    box-shadow: var(--input-box-shadow);
+    outline: 2px solid transparent;
+    outline-offset: -2px;
+    transition: outline-color 0.5s;
+}
+
+.monks-journal-sheet .slideshow-container .slide-details color-picker {
+    background: transparent;
 }
 
 .monks-journal-sheet .slideshow-container:not(.playing) .slide-showing {
@@ -2044,6 +2065,32 @@ body:not(.system-pf2e) .monks-journal-sheet .sheet-container .tag {
     perspective: 2000px;
     -webkit-perspective: 2000px;
     flex: 1;
+}
+
+.monks-journal-sheet .slideshow-container .slide-replay {
+    display: none;
+    position: absolute;
+    top: 30%;
+    width: 100%;
+    text-align: center;
+    z-index: 20;
+    font-size: 28px;
+    line-height: 60px;
+    background-color: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgb(0, 0, 0);
+    color: rgb(255, 255, 255);
+}
+.monks-journal-sheet .slideshow-container .slide-replay.show {
+    display: block;
+}
+
+.monks-journal-sheet .slideshow-container .slide-replay button {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 20px;
+    font-size: var(--font-size-13);
+    padding: 0 0.25rem;
 }
 
 .monks-journal-sheet .slideshow-container .slideshow-body-outer {

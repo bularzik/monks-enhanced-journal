@@ -199,7 +199,9 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     _getHeaderControls() {
         if (this.enhancedjournal)
             return [];
-        return this._documentControls().filter(c => !c.type || c.type == "button");
+        let controls = super._getHeaderControls();
+        controls = controls.filter(c => c.action != "configureSheet");
+        return [...controls, ...this._documentControls().filter(c => !c.type || c.type == "button")];
     }
 
     static get defaultObject() {
@@ -707,7 +709,13 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     async subRender(context, options) {
         // Allow the notes to be editable by players even if they can't edit the journal entry
         let hasGM = (game.users.find(u => u.isGM && u.active) != undefined);
-        if (hasGM) {
+        let isEditable = true;
+        if (this.document.pack) {
+            const pack = game.packs.get(this.document.pack);
+            if (pack.locked) isEditable = false;
+        }
+
+        if (hasGM && isEditable) {
             $('.tab.notes .editor-edit', this.trueElement).removeAttr('disabled');
             let editor = $(".notes-container prose-mirror.editor").on("open", (ev) => {
                 editor.get(0).disabled = false;
@@ -1038,15 +1046,8 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                         },
                         content: "Are you sure you want to clear the image?",
                         yes: {
-                            callback: async () => {
-                                await that.document.update({ src: "" });
-                                if (this.constructor.type == "picture") {
-                                    $('img[data-edit="src"],div.picture-img', this.trueElement).css({ opacity: 0 }).attr('src', "").css({ backgroundImage: "" });
-                                    $('.sheet-body .instruction, .tab.picture .instruction', this.trueElement).show();
-                                } else {
-                                    let defaultImage = this.constructor.type == "picture" ? "" : `modules/monks-enhanced-journal/assets/${this.constructor.type}.png`;
-                                    $('img[data-edit="src"],div.picture-img', this.trueElement).attr('src', defaultImage).css({ backgroundImage: defaultImage });
-                                }
+                            callback: () => {
+                                that._onClearImage.call(that);
                             }
                         }
                     });
@@ -1137,7 +1138,11 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         // directory search-mode toggle, sort toggle, etc. for the rest of the
         // session, since nothing outside the subsheet's own replaced content
         // ever gets a matching _toggleDisabled(false) to re-enable it.
-        for (const el of element.querySelectorAll("input, select, textarea, button")) el.disabled = disabled;
+        for (const el of element.querySelectorAll("input, select, textarea, button")) {
+            // 14.01: never disable window header controls - they belong to the frame, not the subsheet content
+            if (el.classList.contains("header-control")) continue;
+            el.disabled = disabled;
+        }
         for (const input of element.querySelectorAll("input[type=image]")) input.disabled = disabled;
         for (const img of element.querySelectorAll("img[data-edit]")) img.classList.toggle("disabled", disabled);
         if (disabled) this._disableFields(element);
@@ -1577,6 +1582,17 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         ip.render(true);
     }
 
+    async _onClearImage(event) {
+        await this.document.update({ src: "" });
+        if (this.constructor.type == "picture" || this.constructor.type == "text") {
+            $('img[data-edit="src"],div.picture-img', this.trueElement).css({ opacity: 0 }).attr('src', "").css({ backgroundImage: "" });
+            $('.sheet-body .instruction, .tab.picture .instruction', this.trueElement).show();
+        } else {
+            let defaultImage = this.constructor.type == "picture" ? "" : `modules/monks-enhanced-journal/assets/${this.constructor.type}.png`;
+            $('img[data-edit="src"],div.picture-img', this.trueElement).attr('src', defaultImage).css({ backgroundImage: defaultImage });
+        }
+    }
+
     _onEditImage(event) {
         event?.preventDefault();
         event?.stopPropagation();
@@ -1644,6 +1660,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     }
 
     static onSubmit(event, form, formData) {
+        event.preventDefault();
         let submitData = this._prepareSubmitData(event, form, formData, {})
 
         if (Object.keys(submitData).length == 0)
@@ -2127,7 +2144,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
             }
         };
 
-        ChatMessage.create(messageData, {});
+        foundry.documents.ChatMessage.implementation.create(messageData, {});
     }
 
     static async confirmQuantity(item, max, verb, showTotal = true, price) {
@@ -2210,8 +2227,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                     for (let [key, item] of Object.entries(items)) {
                         let quantity = foundry.utils.getProperty(item, "flags.monks-enhanced-journal.quantity") ?? 0;
                         if (quantity <= 0) {
-                            delete items[key];
-                            items[`-=${key}`] = null;
+                            items[key] = new foundry.data.operators.ForcedDeletion();
                         }
                     }
                     entry.setFlag('monks-enhanced-journal', 'items', items);
@@ -2258,7 +2274,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                 }
             };
 
-            ChatMessage.create(messageData, {});
+            foundry.documents.ChatMessage.implementation.create(messageData, {});
         }
     }
 
@@ -2607,23 +2623,6 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                                             }
                                         }
                                 }
-                                /*
-                                if (tableresult.collection === undefined) {
-                                    //check to see if this is a roll for currency
-                                    
-                                } else {
-                                    item = tableresult.collection.get(tableresult.id);
-                                    if (tableresult.collection === "Item") {
-                                        let collection = game.collections.get(tableresult.collection);
-                                        if (collection)
-                                            item = collection.get(tableresult.resultId);
-                                    } else {
-                                        // Try to find it in the compendium
-                                        const items = game.packs.get(tableresult.collection);
-                                        if (items)
-                                            item = await items.getDocument(tableresult.resultId);
-                                    }
-                                }*/
 
                                 if (item) {
                                     if (itemtype == "items" && item instanceof Item) {
@@ -3296,6 +3295,11 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
     }
 
     async addRelationship(relationship, cascade = true) {
+        if (this.document.pack) {
+            const pack = game.packs.get(this.document.pack);
+            if (pack.locked) return;
+        }
+
         let entity = await fromUuid(relationship.uuid);
 
         if (!entity)
@@ -3539,7 +3543,7 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
                     content: selectedHTML.html(),
                 };
 
-                ChatMessage.create(messageData, {});
+                foundry.documents.ChatMessage.implementation.create(messageData, {});
             } else
                 ui.notifications.warn(i18n("MonksEnhancedJournal.NothingSelected"));
         } else {

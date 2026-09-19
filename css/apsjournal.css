@@ -120,6 +120,7 @@
     --apsj-primary-color-dark: 120, 0, 0;
     --apsj-primary-color-bright: 231, 191, 191;
     --mej-sidebar-document-color: rgb(var(--mej-light-0));
+    --mej-sidebar-button-color: rgb(var(--mej-light-2));
 }
 
 :root[mejtheme='orange'] {
@@ -128,6 +129,8 @@
     --apsj-primary-color-dark: 215, 88, 0;
     --apsj-primary-color-bright: 255, 223, 191;
     --mej-sidebar-document-color: rgb(var(--mej-light-0));
+    --mej-sidebar-button-color: rgb(var(--mej-light-2));
+    --mej-sidebar-input-placeholder-color: rgb(var(--mej-dark-1));
 }
 
 :root[mejtheme='yellow'] {
@@ -170,6 +173,8 @@
     --apsj-primary-color-dark: 64, 0, 153;
     --apsj-primary-color-bright: 217, 197, 239;
     --mej-sidebar-document-color: rgb(var(--mej-light-0));
+    --mej-sidebar-button-color: rgb(var(--mej-light-2));
+    --mej-sidebar-input-placeholder-color: rgb(var(--mej-dark-1));
 }
 
 :root[mejtheme='black'] {
@@ -185,7 +190,8 @@
     --mej-sidebar-folder-color-collapsed: rgb(var(--mej-light-2));
     --mej-sidebar-folder-color: rgb(var(--mej-light-2));
     --mej-sidebar-input-placeholder-color: rgb(var(--mej-light-6));
-    --mej-itemlist-control-color: rgb(var(--mej-dark-1))
+    --mej-itemlist-control-color: rgb(var(--mej-dark-1));
+    --mej-sidebar-button-color: rgb(var(--mej-light-2));
 }
 
 /**

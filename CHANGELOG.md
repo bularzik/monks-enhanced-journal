@@ -20,6 +20,56 @@ Restored the Maximize button, now available in the window controls dropdown.
 
 Replaced deprecated API usage that would stop working in v15 and v16 (global namespaces, context menu entry format, and flag deletion syntax).
 
+## Upstream 14.01 (ironmonk108)
+
+v14 Compatibility
+
+Fixed an issue with closing the objective display properly
+
+Fixed issue where slide texts reset when saved
+
+Removing duplicate prose mirror commands
+
+Fixed sidebar colouring issues when changing colours
+
+Fixed issue where a journal entry wouldn't allow for changing to dark or light mode
+
+Adding slideshow "Currently Playing" to the journal directory
+
+Adding defunct to relationships
+
+Fixed Picture instruction section
+
+Fixed List progress bar styling
+
+Added "Replay Slide" button to slideshows
+
+Changed to remember the collapsed state of the sidemenu in the enhanced journal
+
+Fixed issues with dropping an Actor into the enhanced journal in an attempt to open it in a tab
+
+Fixed issue with compiling an Adventure Packs losing all linking information
+
+Fixed issues where Foundry is calling the same Hook for both the Note Palette and Note Config.
+
+Fixed issues when trying to edit a Journal Entry from the context menu
+
+Adding unknown items, when pulling from roll table, to a chat message to inform the GM if roll table items havn't been added
+
+Removing two way relationship reveal
+
+Fixing Create Scroll from Spell
+
+Fixed issue when adding relationship from locked compendium
+
+Fixed doouble clicking on List progress buttons by ignoring the double click.  You can now quickly change the progress without popping up the edit window.
+
+Fixed rewards on the Quest sheet
+
+Fixed to only display add instructions when you are the owner and can actually edit the journal entry
+
+Fixed trying to open a journal tab while still loading a previous tab
+
 # Version 13.06
 
 Fixing an issue if Conversation-HUD isn't installed.

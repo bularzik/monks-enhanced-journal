@@ -98,6 +98,7 @@
     --mej-sheet-input-border: 1px solid rgb(122, 121, 113);
     --mej-sheet-input-background: rgba(0, 0, 0, 0.05);
     --mej-sheet-input-color: var(--mej-color-form-label);
+    --mej-sheet-content-background: rgba(11, 10, 19, 0.9);
     --mej-itemlist-background: rgba(0, 0, 0, 0.05);
     --mej-itemlist-colour: rgb(122, 121, 113);
     --mej-itemlist-border: rgb(238, 237, 224);
@@ -149,6 +150,7 @@
     --mej-blank-recent-border: rgba(255, 255, 255, 0.5);
     --mej-blank-link-hover: rgba(0, 0, 0, 0.8);
     --mej-sidebar-background: url(../../../ui/parchment.jpg) repeat;
+    --mej-sidebar-button-color: var(--mej-sidebar-label-color);
     --mej-sidebar-button-background: rgba(0, 0, 0, 0.1);
     --mej-sidebar-button-border: rgb(238, 237, 224);
     --mej-sidebar-input-border: rgb(192, 192, 192);
@@ -156,7 +158,7 @@
     --mej-sidebar-input-background-focus: var(--mej-cream);
     --mej-sidebar-input-color: var(--color-form-label);
     --mej-sidebar-input-placeholder-color: var(--mej-placeholder-color);
-    --mej-sidebar-label-color: rgb(var(--mej-light-2));
+    --mej-sidebar-label-color: rgb(var(--mej-dark-2));
     --mej-sidebar-folder-border-collapsed: rgb(139, 138, 131);
     --mej-sidebar-folder-border: rgb(116, 115, 109);
     --mej-sidebar-folder-background-collapsed: rgb(154, 154, 147);
@@ -579,6 +581,14 @@
     flex: 1;
 }
 
+.monks-enhanced-journal .content .journal-entry-content {
+    background: var(--mej-sheet-content-background);
+}
+
+.monks-enhanced-journal .content.themed.theme-light {
+    --mej-sheet-content-background: url(../../../ui/parchment.jpg) repeat;
+}
+
 .monks-enhanced-journal .enhanced-journal .enhanced-journal-body .content[document-type='actor'] form {
     overflow-y: auto;
 }
@@ -653,19 +663,19 @@
 }
 */
 
-.monks-enhanced-journal .directory .directory-header .header-search input {
+.monks-enhanced-journal .directory .directory-header search input {
     height: var(--form-field-height);
     border: 1px solid var(--mej-sidebar-input-border);
     background: var(--mej-sidebar-input-background);
 }
 
-.monks-enhanced-journal .directory .directory-header .header-search input:hover,
-.monks-enhanced-journal .directory .directory-header .header-search input:focus,
-.monks-enhanced-journal .directory .directory-header .header-search input:active {
+.monks-enhanced-journal .directory .directory-header search input:hover,
+.monks-enhanced-journal .directory .directory-header search input:focus,
+.monks-enhanced-journal .directory .directory-header search input:active {
     background: var(--mej-sidebar-input-background-focus);
 }
 
-.monks-enhanced-journal .directory .directory-header .header-search input::placeholder {
+.monks-enhanced-journal .directory .directory-header search input::placeholder {
     color: var(--mej-sidebar-input-placeholder-color);
 }
 
@@ -686,6 +696,28 @@
 
 .monks-enhanced-journal .directory-sidebar > section .directory-header button {
     color: var(--mej-sidebar-label-color);
+}
+
+.monks-enhanced-journal .directory-sidebar > section .directory-header search button {
+    color: var(--mej-sidebar-button-color);
+}
+
+.monks-enhanced-journal .directory-sidebar > section .directory-header search input {
+    color: var(--mej-sidebar-button-color);
+}
+
+.monks-enhanced-journal .directory-sidebar > section .directory-header .header-actions button {
+    background: var(--mej-sidebar-button-background);
+    border: 1px solid var(--mej-sidebar-button-border);
+}
+
+.monks-enhanced-journal .directory-sidebar > section .directory-header button:hover {
+    background: var(--color-warm-2);
+    color: var(--color-light-1);
+}
+
+.monks-enhanced-journal .directory-sidebar > section .directory-header .header-actions button:hover {
+    border-color: var(--color-light-3);
 }
 
 .monks-enhanced-journal .directory-sidebar > section .directory-list {
@@ -727,7 +759,8 @@
 
 .monks-enhanced-journal .directory .mej-search-result .mej-search-snippet {
     font-size: var(--font-size-12, 12px);
-    /* --mej-sidebar-label-color is a light tone meant for the darker header bar;
+    /* --mej-sidebar-label-color is scoped to the .directory-header bar and, since
+       14.01, resolves to a dark tone in the light theme (rgb(var(--mej-dark-2)));
        the row background here is the same cream parchment as the folder tree
        (.directory-list document rows use --mej-sidebar-document-color), so use
        the muted-but-readable placeholder tone instead. */
@@ -2023,4 +2056,91 @@ body.theme-light #list-item-edit .items-list header {
 
     /* Portrait plate (behind transparent portrait images) */
     --mej-portrait-background: rgb(55, 55, 52);
+}
+
+.unknown-item-list {
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 0.25rem;
+    line-height: normal;
+    flex: auto;
+    margin: 0;
+    position: relative;
+    border: 1px solid #999;
+    box-shadow: 0 0 2px #FFF inset;
+    word-break: break-all;
+}
+
+#journal .currently-playing {
+    /* 14.01 declared this on a bare .journal-sidebar; both readers are inside
+       #journal .currently-playing, so it is scoped to the consumer instead of
+       leaking a variable into the whole journal sidebar. */
+    --entry-height: 20px;
+    font-size: var(--font-size-14);
+}
+
+#journal .currently-playing header {
+    display: flex;
+    gap: 5px;
+    line-height: var(--entry-height);
+    align-items: center;
+}
+
+#journal .currently-playing > header {
+    padding: 8px;
+    background: var(--color-dark-1);
+    border-top: 1px solid var(--color-dark-1);
+    border-bottom: 1px solid var(--color-dark-1);
+    color: var(--color-light-2);
+}
+
+#journal .currently-playing > .slideshow-playing {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#journal .currently-playing > .slideshow-playing .slideshow {
+    display: flex;
+    flex-direction: column;
+}
+
+#journal .currently-playing > .slideshow-playing .slideshow header label {
+    flex: 1;
+}
+
+#journal .currently-playing > .slideshow-playing .slideshow .slideshow-controls {
+    flex: 0 0 32px;
+    justify-content: end;
+}
+
+#journal .currently-playing > .slideshow-playing .slideshow .slideshow-controls button,
+#journal .currently-playing > .slideshow-playing .slideshow .slideshow-playback button {
+    --button-size: 1rem;
+    --button-hover-background-color: transparent;
+    --button-text-color: var(--color-text-primary);
+    --button-hover-text-color: var(--color-text-accent);
+    border: none;
+    font-size: var(--font-size-11);
+    transition: color 0.5s;
+}
+
+#journal .currently-playing > .slideshow-playing .slideshow .slideshow-playback {
+    line-height: var(--entry-height);
+    margin: 0;
+    gap: 4px;
+}
+
+#journal .currently-playing > .slideshow-playing .slideshow .slideshow-playback .slide-at {
+    flex: 1;
+    font-size: var(--font-size-11);
+    color: var(--color-text-secondary);
+}
+
+#journal .currently-playing > .slideshow-playing .slideshow.stopped [data-action="slidePause"],
+#journal .currently-playing > .slideshow-playing .slideshow.stopped [data-action="slideStop"],
+#journal .currently-playing > .slideshow-playing .slideshow.paused [data-action="slidePause"],
+#journal .currently-playing > .slideshow-playing .slideshow.playing [data-action="slidePlay"] {
+    display: none;
 }

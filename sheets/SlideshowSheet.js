@@ -19,6 +19,7 @@ export class SlideshowSheet extends EnhancedJournalSheet {
         actions: {
             addSlide: SlideshowSheet.doAddSlide,
             deleteAll: SlideshowSheet.deleteAll,
+            playAgain: SlideshowSheet.playAgain,
         },
     };
 
@@ -100,19 +101,20 @@ export class SlideshowSheet extends EnhancedJournalSheet {
     async _prepareBodyContext(context, options) {
         context = await super._prepareBodyContext(context, options);
 
-        context.playControls = true;
-
-        context.fontOptions = foundry.utils.mergeObject({ "": "" }, foundry.applications.settings.menus.FontConfig.getAvailableFontChoices());
-
         let flags = (context.data.flags["monks-enhanced-journal"]);
         if (flags == undefined) {
             context.data.flags["monks-enhanced-journal"] = {};
             flags = (context.data.flags["monks-enhanced-journal"]);
         }
+
         context.showasOptions = { canvas: i18n("MonksEnhancedJournal.Canvas"), fullscreen: i18n("MonksEnhancedJournal.FullScreen"), window: i18n("MonksEnhancedJournal.Window") };
         if (flags.playstate == undefined)
             flags.playstate = 'stopped';
         context.playing = (flags.playstate != 'stopped') || !this.document.isOwner;
+
+        context.playControls = this.document.testUserPermission(game.user, "OBSERVER");
+
+        context.fontOptions = foundry.utils.mergeObject({ "": "" }, foundry.applications.settings.menus.FontConfig.getAvailableFontChoices());
 
         context.effectOptions = MonksEnhancedJournal.effectTypes;
 
@@ -279,9 +281,18 @@ export class SlideshowSheet extends EnhancedJournalSheet {
     async refresh() {
         super.refresh();
         let playstate = this.document.flags['monks-enhanced-journal'].playstate || "stopped";
-        if (playstate != 'stopped' && !this.document.isOwner) {
-            this.playSlide();
-        }
+        if (playstate != 'stopped' || !this.document.isOwner)
+            this.playSlideshow();
+    }
+
+    _toggleDisabled(disabled) {
+        super._toggleDisabled(disabled);
+        $('.slide-replay button', this.trueElement).removeAttr('disabled');
+    }
+
+    _disableFields(form) {
+        super._disableFields(form);
+        $('.slide-replay button', this.trueElement).removeAttr('disabled');
     }
 
     async activateListeners(html) {
@@ -298,8 +309,10 @@ export class SlideshowSheet extends EnhancedJournalSheet {
         $('.slideshow-body .slide', html)
             .click(this.activateSlide.bind(this))
             .dblclick(function (event) {
-                let id = event.currentTarget.dataset.slideId;
-                that.editSlide(id);
+                if (that.document.isOwner) {
+                    let id = event.currentTarget.dataset.slideId;
+                    that.editSlide(id);
+                }
             });
         $('.slide-showing', html).click(this.advanceSlide.bind(this, 1)).contextmenu(this.advanceSlide.bind(this, -1));
 
@@ -318,11 +331,6 @@ export class SlideshowSheet extends EnhancedJournalSheet {
         $('.slideshow-body .slide-textarea', html).css({ 'font-size': `${size}px` });
 
         this.updateButtons();
-    }
-
-    async close(options) {
-        this.stopSlideshow();
-        return super.close(options);
     }
 
     _canDragDrop(selector) {
@@ -373,6 +381,10 @@ export class SlideshowSheet extends EnhancedJournalSheet {
         log('drop data', from, to, event, data);
 
         event.stopPropagation();
+    }
+    
+    static playAgain(event, target) {
+        this.playSlideshow();
     }
 
     static doAddSlide(event, target) {
@@ -447,7 +459,7 @@ export class SlideshowSheet extends EnhancedJournalSheet {
     }
 
     activateSlide(event) {
-        if (this.document.flags["monks-enhanced-journal"].playstate != 'stopped') {
+        if (this.document.flags["monks-enhanced-journal"].playstate != 'stopped' || !this.document.isOwner) {
             let idx = $(event.currentTarget).index();
             this.document.flags["monks-enhanced-journal"].slideAt = idx;
             this.playSlide(idx);
@@ -471,9 +483,11 @@ export class SlideshowSheet extends EnhancedJournalSheet {
             return;
         }
 
+        $('.slide-replay', this.trueElement).removeClass('show');
+
         if (this.enhancedjournal) {
             this.enhancedjournal.changeTab("slides", "primary", { navElement: $("nav.sheet-tabs.tabs", this.trueElement).get(0) });
-        } else
+        } else if (this.rendered)
             this.changeTab("slides", "primary", { navElement: $("nav.sheet-tabs.tabs", this.trueElement).get(0) });
 
         if (flags.playstate == 'playing')
@@ -499,14 +513,14 @@ export class SlideshowSheet extends EnhancedJournalSheet {
                     return sound;
                 });
             }
-            if (flags.pauseplaylist) {
-                currentlyPlaying = ui.playlists._playing.playlists.map(ps => ps.playing ? ps.uuid : null).filter(p => !!p);
+            if (flags.pauseplaylist && this.document.isOwner) {
+                currentlyPlaying = ui.playlists._playing.sounds.map(ps => ps.playing ? ps.uuid : null).filter(p => !!p);
                 for (let playing of currentlyPlaying) {
                     let sound = await fromUuid(playing);
                     sound.update({ playing: false, pausedTime: sound.sound.currentTime });
                 }
             }
-            if (flags.playlist != undefined) {
+            if (flags.playlist != undefined && this.document.isOwner) {
                 let playlist = game.playlists.get(flags.playlist);
                 if (playlist)
                     playlist.playAll();
@@ -537,6 +551,9 @@ export class SlideshowSheet extends EnhancedJournalSheet {
 
         this.playSlide(flags.slideAt, animate);
         //this.document.update({ 'flags.monks-enhanced-journal': this.document.flags["monks-enhanced-journal"] });
+
+        if (game.user.isGM)
+            MonksEnhancedJournal.addSlideshowControls(this.document.parent.id);
     }
 
     async pauseSlideshow() {
@@ -562,6 +579,9 @@ export class SlideshowSheet extends EnhancedJournalSheet {
             this.document.slidesound.stop();
             delete this.document.slidesound;
         }
+
+        if (game.user.isGM)
+            MonksEnhancedJournal.addSlideshowControls(this.document.parent.id);
     }
 
     async stopSlideshow() {
@@ -576,6 +596,7 @@ export class SlideshowSheet extends EnhancedJournalSheet {
         } else {
             flags.playstate = "stopped";
             flags.slideAt = 0;
+            $('.slide-replay', this.trueElement).addClass('show');
         }
 
         $('.slide-showing .duration', this.trueElement).hide().stop();
@@ -620,6 +641,8 @@ export class SlideshowSheet extends EnhancedJournalSheet {
 
         //++++ why am I doing it this way and not using setFlag specifically?
         //this.document.update({ 'flags.monks-enhanced-journal': this.document.flags["monks-enhanced-journal"] });
+        if (game.user.isGM)
+            MonksEnhancedJournal.addSlideshowControls();
     }
 
     showSlide() {
@@ -792,6 +815,17 @@ export class SlideshowSheet extends EnhancedJournalSheet {
                 loaded.call(this);
             })
         }
+
+        if (game.user.isGM)
+            MonksEnhancedJournal.addSlideshowControls(this.document.parent.id);
+    }
+
+    previousSlide(event) {
+        this.advanceSlide(-1, event);
+    }
+
+    nextSlide(event) {
+        this.advanceSlide(1, event);
     }
 
     advanceSlide(dir, event) {
@@ -863,9 +897,9 @@ export class SlideshowSheet extends EnhancedJournalSheet {
 }
 
 Hooks.on("renderSlideshowSheet", (sheet, html, data) => {
-    if (sheet.object.flags['monks-enhanced-journal'].playstate != 'stopped') {
+    if (sheet.document.flags['monks-enhanced-journal'].playstate != 'stopped') {
         sheet.playSlide();
-    } else if (!sheet.object.isOwner) {
+    } else if (!sheet.document.isOwner) {
         sheet.showSlide();
     }
 });
