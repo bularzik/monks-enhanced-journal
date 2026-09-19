@@ -253,8 +253,15 @@ await withSession('maintainer-features', { users: ['Gamemaster', 'User 1'] }, as
   });
 
   // --- cluster: selectplayer.js removed upstream (14.01 deleted the dead scaffolding) ---
-  const selectPlayerStatus = await gm.evaluate(async () => (await fetch('/modules/monks-enhanced-journal/apps/selectplayer.js')).status);
-  assert.equal(selectPlayerStatus, 404, 'apps/selectplayer.js should no longer ship');
+  // Checked through FilePicker.browse(), not fetch(): a fetch of a removed file
+  // returns 404 *and* logs "Failed to load resource: 404" to the browser console,
+  // which this spec's own no-unexpected-console-errors bar then fails on (and
+  // tolerating that text globally would mask real missing-asset 404s - it is how
+  // the stray `/undefined` slide-image request was caught).
+  const appsFiles = await gm.evaluate(async () =>
+    (await foundry.applications.apps.FilePicker.implementation.browse('data', 'modules/monks-enhanced-journal/apps')).files);
+  assert.ok(appsFiles.length > 0, 'FilePicker.browse() should list the module apps directory');
+  assert.ok(!appsFiles.some((f) => f.endsWith('/selectplayer.js')), 'apps/selectplayer.js should no longer ship');
   const defunctPngStatus = await gm.evaluate(async () => {
     const res = await fetch('/modules/monks-enhanced-journal/assets/defunct.png');
     return res.status;

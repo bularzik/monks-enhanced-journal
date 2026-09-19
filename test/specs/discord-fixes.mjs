@@ -29,6 +29,17 @@ await withSession('discord-fixes', { users: ['Gamemaster', 'User 1'] }, async (s
       if (msg.type() === 'warning' && msg.text().includes('ControlIcon#iconSrc')) depWarnings.push(msg.text());
     });
 
+    // A fresh client only draws the canvas for the scene it is *viewing*, and
+    // world-a's single scene is not active, so `canvas.scene` comes up null and
+    // EncounterTemplate.fromEncounter()'s `new cls(data, { parent: canvas.scene })`
+    // throws "You must provide an embedded Document instance" before any preview
+    // exists. View a scene explicitly instead of depending on the world/user's
+    // persisted viewedScene (which has been null in world-a since 2026-09).
+    await canvasGm.evaluate(async () => {
+      if (!canvas.scene) await (game.scenes.current ?? game.scenes.contents[0])?.view();
+    });
+    await canvasGm.waitForFunction(() => !!canvas.scene && canvas.ready === true, null, { timeout: 30_000 });
+
     actorId = await canvasGm.evaluate(async () => {
       const a = await Actor.create({ name: 'TT-discord-enc-monster', type: 'npc' });
       return a.id;
