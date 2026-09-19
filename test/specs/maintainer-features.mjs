@@ -156,14 +156,9 @@
 //      Foundry version. Not given a dedicated section: every sheet type this spec (and
 //      smoke-sheets.mjs) opens exercises these same code paths, and the spec's overall
 //      no-unexpected-console-errors bar covers all of them collectively.
-//  11. selectplayer/defunct.png       SKIPPED (documented) - `apps/selectplayer.js` (class
-//      SelectPlayer) and `assets/defunct.png` are new but unreferenced anywhere, including
-//      in the maintainer's own 14.00 zip - dead code, not wired to any menu/button/hook.
-//      selectplayer.js's own PARTS.main.template points at
-//      "modules/monks-enhanced-journal/templates/selectplayer.html", which does not exist
-//      in the repo - even a manual `new SelectPlayer(...).render(true)` would fail on
-//      template fetch, so there is no UI path to drive. Covered by an import-resolves smoke
-//      check only, per the task brief.
+//  11. selectplayer/defunct.png       `apps/selectplayer.js` was removed upstream in 14.01
+//      (dead scaffolding); the cluster now asserts the file is no longer served (HTTP 404)
+//      and that `assets/defunct.png` is still served (200).
 import assert from 'node:assert/strict';
 import { withSession, createEntry, openEntry, setEntryFlag } from '../helpers/mej.js';
 
