@@ -2,7 +2,6 @@ import { MonksEnhancedJournal, log, i18n, error, setting, getVolume, makeid  } f
 import { EnhancedJournalSheet } from "../sheets/EnhancedJournalSheet.js"
 import { BlankSheet } from "../sheets/BlankSheet.js"
 import { JournalEntrySheet } from "../sheets/JournalEntrySheet.js"
-import { ApplicationSheetConfig } from "./sheet-configure.js";
 const { ApplicationV2, DocumentSheetV2, HandlebarsApplicationMixin } = foundry.applications.api
 
 // Types that don't correspond to a real, persisted document: the built-in "blank"/"folder"
@@ -161,8 +160,9 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
         options = super._initializeApplicationOptions(options);
 
         const { colorScheme } = game.settings.get("core", "uiConfig");
-        const userTheme = game.user.getFlag("monks-enhanced-journal", "themes.enhancedjournal");
-        options.classes.push("themed", `theme-${userTheme || colorScheme.applications || "dark"}`);
+        const { defaults, documents } = game.settings.get("core", "sheetThemes");
+        const sheetTheme = (documents || {})[options.document?.uuid] || (defaults || {}).JournalEntry?.base || colorScheme.applications || "dark";
+        options.classes.push("themed", `theme-${sheetTheme}`);
 
         if (game.modules.get("rippers-ui")?.active)
             options.classes.push('rippers-ui');

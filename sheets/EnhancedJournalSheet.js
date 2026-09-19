@@ -340,21 +340,6 @@ export class EnhancedJournalSheet extends HandlebarsApplicationMixin(foundry.app
         });
     }
 
-    /*
-    static onConfigureSheet(event) {
-        event.stopPropagation(); // Don't trigger other events
-        if (event.detail > 1) return; // Ignore repeated clicks
-
-        new ApplicationSheetConfig({
-            type: "enhancedjournal",
-            position: {
-                top: this.position.top + 40,
-                left: this.position.left + ((this.position.width - 500) / 2)
-            }
-        }).render({ force: true });
-    }
-    */
-
     refresh() { }
 
     get isEditable() {
