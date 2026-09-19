@@ -257,15 +257,9 @@ await withSession('maintainer-features', { users: ['Gamemaster', 'User 1'] }, as
     for (const m of stale) await m.delete();
   });
 
-  // --- cluster: selectplayer.js / defunct.png orphaned scaffolding (smoke only) ---
-  const selectPlayerImport = await gm.evaluate(async () => {
-    try {
-      const m = await import('/modules/monks-enhanced-journal/apps/selectplayer.js');
-      return { keys: Object.keys(m) };
-    } catch (e) { return { error: e.message }; }
-  });
-  assert.ok(!selectPlayerImport.error, `selectplayer.js should import cleanly: ${selectPlayerImport.error}`);
-  assert.ok(selectPlayerImport.keys.includes('SelectPlayer'), 'selectplayer.js should export SelectPlayer');
+  // --- cluster: selectplayer.js removed upstream (14.01 deleted the dead scaffolding) ---
+  const selectPlayerStatus = await gm.evaluate(async () => (await fetch('/modules/monks-enhanced-journal/apps/selectplayer.js')).status);
+  assert.equal(selectPlayerStatus, 404, 'apps/selectplayer.js should no longer ship');
   const defunctPngStatus = await gm.evaluate(async () => {
     const res = await fetch('/modules/monks-enhanced-journal/assets/defunct.png');
     return res.status;

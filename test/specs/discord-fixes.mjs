@@ -62,17 +62,13 @@ await withSession('discord-fixes', { users: ['Gamemaster', 'User 1'] }, async (s
 
     assert.equal(depWarnings.length, 0, `ControlIcon#iconSrc deprecation fired: ${depWarnings[0] ?? ''}`);
 
-    // Harden beyond the deprecation warning itself: the pre-fix code's second
-    // line (`this.controlIcon.texture = null`) clobbered the icon right back to
-    // empty immediately after the deprecated iconSrc setter set it - so the
-    // sword icon silently failed to render at all, independent of the warning.
-    // This is the actual user-visible "Create Encounter Buttons" symptom.
+    // Maintainer ruling 2026-09-03: the placement control icon is intentionally blank
+    // (`controlIcon.texture = null`); only the iconSrc deprecation must stay gone.
     const iconState = await canvasGm.evaluate(() => {
       const ci = canvas.templates.encounterTemplate.controlIcon;
       return { isEmpty: ci.icon.texture === PIXI.Texture.EMPTY, isValid: !!ci.icon.texture?.valid };
     });
-    assert.equal(iconState.isEmpty, false, 'encounter placement preview icon texture is EMPTY - sword icon is not rendering');
-    assert.equal(iconState.isValid, true, 'encounter placement preview icon texture did not load');
+    assert.equal(iconState.isEmpty, true, 'encounter placement preview icon should be blank (texture = null) per maintainer ruling');
 
     // Cancel placement: EncounterTemplate.activatePreviewListeners binds
     // cancellation to canvas.app.view.oncontextmenu (right-click), NOT Escape -
