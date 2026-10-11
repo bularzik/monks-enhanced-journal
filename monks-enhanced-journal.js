@@ -113,6 +113,11 @@ export class MonksEnhancedJournal {
 				if (MonksEnhancedJournal.getDocumentTypes()[key])
 					throw new Error(`Journal type '${key}' is already registered`);
 				MonksEnhancedJournal.externalTypes[key] = { moduleId, sheetClass, label, icon, relationships };
+				// Foundry 14.369+ skips a sub-type with no sheetClasses entry. After ready this
+				// registration applies immediately, so give the unprefixed key one; before ready
+				// repairSheetClasses() re-registers it once the game is ready.
+				if (game.ready && CONFIG.JournalEntryPage.sheetClasses[key] == undefined)
+					CONFIG.JournalEntryPage.sheetClasses[key] = {};
 				foundry.applications.apps.DocumentSheetConfig.registerSheet(JournalEntryPage, moduleId, sheetClass, {
 					types: [key, `${moduleId}.${key}`],
 					makeDefault: true,
@@ -2418,6 +2423,38 @@ export class MonksEnhancedJournal {
 		CONFIG.JournalEntryPage.typeLabels = foundry.utils.mergeObject((CONFIG.JournalEntryPage.typeLabels || {}), labels);
 	}
 
+	// Foundry 14.369 no longer creates a sheetClasses entry for a sub-type that isn't in
+	// game.documentTypes, and it rebuilds CONFIG.JournalEntryPage.sheetClasses before applying
+	// the registrations queued during init. So the unprefixed types that fixType() switches pages
+	// to (person, shop, ..., and those added through api.registerSheetType) end up with no sheet,
+	// and the page falls back to core's BaseSheet. Once the game is ready registerSheet applies
+	// immediately, so register any that are missing. On earlier builds nothing is missing and
+	// this does nothing.
+	static repairSheetClasses() {
+		let types = MonksEnhancedJournal.getDocumentTypes();
+		let labels = MonksEnhancedJournal.getTypeLabels();
+		let sheetClasses = CONFIG.JournalEntryPage.sheetClasses;
+
+		for (let [k, v] of Object.entries(labels)) {
+			if (sheetClasses[k] != undefined)
+				continue;
+			sheetClasses[k] = {};
+			let scope = MonksEnhancedJournal.externalTypes[k]?.moduleId || "monks-enhanced-journal";
+			foundry.applications.apps.DocumentSheetConfig.registerSheet(JournalEntryPage, scope, types[k] || foundry.appv1.sheets.JournalPageSheet, {
+				types: [k],
+				makeDefault: true,
+				label: i18n(v)
+			});
+			if (k == "journalentry") {
+				foundry.applications.apps.DocumentSheetConfig.registerSheet(JournalEntryPage, "monks-enhanced-journal", TextImageEntrySheet, {
+					types: ["journalentry"],
+					makeDefault: false,
+					label: "Text and Image"
+				});
+			}
+		}
+	}
+
 	static showAsChatBubble(object, journal, pageId) {
 		if (!journal || !journal.pages || journal.pages.size == 0)
 			return;
@@ -2763,6 +2800,8 @@ export class MonksEnhancedJournal {
 	}
 
 	static async ready() {
+		MonksEnhancedJournal.repairSheetClasses();
+
 		game.socket.on(MonksEnhancedJournal.SOCKET, MonksEnhancedJournal.onMessage);
 
 		APSJ.init();
