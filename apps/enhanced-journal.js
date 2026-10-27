@@ -277,13 +277,17 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _getHeaderControls() {
         let controls = super._getHeaderControls();
-        if (!!MonksEnhancedJournal.getMEJType(this.document)) {
+        if (!!MonksEnhancedJournal.getMEJType(this.document) || this.document == null) {
             controls = controls.filter(c => c.action != "configureSheet");
         }
         let sub_controls = this.subsheet?._getHeaderControls?.() || [];
+        if (!!MonksEnhancedJournal.getMEJType(this.document) || this.document == null) {
+            sub_controls = sub_controls.filter(c => c.action != "configureSheet");
+        }
         for (let ctrl of sub_controls) {
             ctrl.onClick = (event) => this._handleContextClick(event, ctrl.action);
         }
+
         return [...controls, ...sub_controls];
     }
 
@@ -503,7 +507,6 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.subsheet = new BlankSheet({ document: this.document, enhancedjournal: this, tabs: this.tabs, position: { width: 1024, height: 768 }, window: {}, ...this.document.options });
                 } else {
                     subsheetOptions = foundry.utils.mergeObject(subsheetOptions, game.user.getFlag("monks-enhanced-journal", `pagestate.${this.document.id}`) || {});
-
                     this.subsheet = new cls({ document: this.document, editable: this.document.isOwner, enhancedjournal: this, ...subsheetOptions });
                 }
                 this.document._sheet = this.subsheet;
@@ -635,8 +638,8 @@ export class EnhancedJournal extends HandlebarsApplicationMixin(ApplicationV2) {
                 $('button[type="submit"]', subsheetElement).attr('type', 'button').on("click", subsheet.constructor.onSubmit.bind(subsheet));
             $('form.journal-header', subsheetElement).on("submit", () => { return false; });
 
-            if (!["blank", "folder"].includes(this.document.type))
-                subsheet.constructor.updateStyle.call(subsheet, null, subsheetElement);
+            //if (!["blank", "folder"].includes(this.document.type))
+            //    subsheet.constructor.updateStyle.call(subsheet, null, subsheetElement);
 
             if (game.modules.get("polyglot")?.active && subsheet.renderPolyglot)
                 subsheet.renderPolyglot(subsheetElement);

@@ -151,7 +151,10 @@ export class ObjectiveDisplay extends HandlebarsApplicationMixin(ApplicationV2) 
     static async openQuest(event, target) {
         let id = target.dataset.documentId;
         let page = await fromUuid(id);
-        MonksEnhancedJournal.openJournalEntry(page);
+        if (!await MonksEnhancedJournal.openJournalEntry(page)) {
+            MonksEnhancedJournal.fixType(page);
+            page.sheet.render(true, { focus: true });
+        }
     }
 
     async close(options) {

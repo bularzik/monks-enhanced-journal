@@ -831,16 +831,7 @@ export class MonksEnhancedJournal {
 		let updateJournalEntryPage = async function (wrapped, ...args) {
 			let [data, context] = args;
 
-			let oldtype;
-			let types = MonksEnhancedJournal.getDocumentTypes();
-			if (types[this.type]) {
-				//oldtype = this.type;
-				//data.type = "text";
-                delete data.type;
-			}
 			let result = await wrapped(data, context);
-			if (oldtype)
-				this.type = oldtype;
 
 			if (data.img != undefined && this.parent) {
 				this.parent.update({ "flags.monks-enhanced-journal.img": data.img });
@@ -2222,7 +2213,7 @@ export class MonksEnhancedJournal {
 			if (CONFIG.JournalEntryPage.sheetClasses[k] == undefined)
 				CONFIG.JournalEntryPage.sheetClasses[k] = {};
 			foundry.applications.apps.DocumentSheetConfig.registerSheet(JournalEntryPage, "monks-enhanced-journal", types[k] || foundry.appv1.sheets.JournalPageSheet, {
-				types: [k, `monks-enhanced-journal.${k}`],
+				types: [`monks-enhanced-journal.${k}`],
 				makeDefault: true,
 				label: i18n(v)
 			});
@@ -2350,7 +2341,7 @@ export class MonksEnhancedJournal {
 	static async openJournalEntryFromId(docId, options = {}) {
 		let doc = await fromUuid(docId);
 		if (doc) {
-			MonksEnhancedJournal.openJournalEntry(doc, options);
+			await MonksEnhancedJournal.openJournalEntry(doc, options);
 		}
 	}
 
@@ -4153,14 +4144,15 @@ export class MonksEnhancedJournal {
 			//}
 			*/
 			type = type || object.type;
+            type = type.replace("monks-enhanced-journal.", "");
 			if (types[type])
-				object.type = type;
+				object.type = `monks-enhanced-journal.${type}`;
 			else if (game.user.isGM)
 				object.unsetFlag("monks-enhanced-journal", "type");
 
 			return type;
-		} else if (["blank", "folder"].includes(foundry.utils.getProperty(object, "flags.monks-enhanced-journal.type"))) {
-			object.type = foundry.utils.getProperty(object, "flags.monks-enhanced-journal.type");
+		} else { // if (["blank", "folder"].includes(foundry.utils.getProperty(object, "flags.monks-enhanced-journal.type") ?? foundry.utils.getProperty(object, "flags.monks-enhanced-journal.pagetype"))) {
+			object.type = foundry.utils.getProperty(object, "flags.monks-enhanced-journal.type") ?? foundry.utils.getProperty(object, "flags.monks-enhanced-journal.pagetype");
 		}
 	}
 
@@ -4798,7 +4790,7 @@ Hooks.on("renderChatMessageHTML", (message, html, data) => {
 			let uuid = ev.currentTarget.dataset.uuid;
 			let entry = await fromUuid(uuid);
 			if (entry) {
-				MonksEnhancedJournal.openJournalEntry(entry);
+				await MonksEnhancedJournal.openJournalEntry(entry);
 			}
 		})
 	}
