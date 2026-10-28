@@ -1,3 +1,7 @@
+# Version 14.02.1 (unofficial test build)
+
+Unofficial patch release from bularzik/monks-enhanced-journal: 14.02 plus the fixes in PR #837 (new entries opening blank, Delete missing from the context menu, page background colors not showing). Not released by the maintainer; report problems at https://github.com/bularzik/monks-enhanced-journal/issues. Updates go back to the official manifest, so the next official release replaces this one.
+
 # Version 14.02
 
 Fixing issues Foundry created with an update
