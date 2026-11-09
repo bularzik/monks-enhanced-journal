@@ -1,3 +1,7 @@
+# Version 14.02.2 (unofficial test build)
+
+Unofficial patch release from bularzik/monks-enhanced-journal: 14.02 plus the fixes in PR #837. Adds to 14.02.1: dropping an Actor or Journal entry into a compendium works again; MEJ registers its sheets only under its namespaced page types, so Foundry 14.369+ no longer warns about the bare "journalentry" type; and on GM login, journal pages from older worlds that still store a legacy type (core "text", "base" or a bare key such as "person") with an MEJ type flag are saved with their namespaced type. Pages stored with a bare key no longer load at all on Foundry 14.369+, and this repairs them. Not released by the maintainer; report problems on https://github.com/ironmonk108/monks-enhanced-journal/pull/837 rather than the main issue tracker. Updates go back to the official manifest, so the next official release replaces this one.
+
 # Version 14.02
 
 Fixing issues Foundry created with an update
