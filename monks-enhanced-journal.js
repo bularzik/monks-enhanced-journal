@@ -1169,7 +1169,7 @@ export class MonksEnhancedJournal {
 			}
 
 			// No fixType() here: `this` is the CompendiumCollection, which has no `object`. In 14.02 the
-			// resulting fixType(undefined) threw, so dropping any Actor, Item or Journal into a compendium
+			// resulting fixType(undefined) threw, so dropping an Actor or Journal into a compendium
 			// silently did nothing.
 			return oldImportDocument.call(this, document, options);
 		}
