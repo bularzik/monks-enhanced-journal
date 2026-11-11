@@ -2243,6 +2243,11 @@ export class MonksEnhancedJournal {
 			CONFIG.JournalEntryPage.dataModels = {};
 		//game.system.documentTypes.JournalEntryPage = game.system.documentTypes.JournalEntryPage.concat(Object.keys(types)).sort();
 		CONFIG.JournalEntryPage.typeLabels = foundry.utils.mergeObject((CONFIG.JournalEntryPage.typeLabels || {}), labels);
+		// Name the namespaced sub-types for core's page-type lists (Add Page, Configure Sheet); without this
+		// core falls back to TYPES.JournalEntryPage.monks-enhanced-journal.*, which MEJ's language files don't
+		// define. Set after the merge above: mergeObject() would expand these dotted keys into a nested object.
+		for (let [k, v] of Object.entries(labels))
+			CONFIG.JournalEntryPage.typeLabels[`monks-enhanced-journal.${k}`] = v;
 	}
 
 	static showAsChatBubble(object, journal, pageId) {
