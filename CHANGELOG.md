@@ -1,3 +1,7 @@
+# Version 14.02.4 (unofficial test build)
+
+Unofficial patch release from bularzik/monks-enhanced-journal: 14.02 plus the fixes in PR #837 and PR #839. Players can buy from shops again. Since 14.01, the Purchase button in a shop was greyed out and did nothing for anyone who doesn't own the shop, so players could sell to a shop but not buy from it. The Make offering and Cancel offer buttons on Person and Organization pages had the same problem. Not released by the maintainer; report problems on https://github.com/ironmonk108/monks-enhanced-journal/pull/839 (or PR #837 for the earlier fixes) rather than the main issue tracker. Updates go back to the official manifest, so the next official release replaces this one.
+
 # Version 14.02.3 (unofficial test build)
 
 Unofficial patch release from bularzik/monks-enhanced-journal: 14.02 plus the fixes in PR #837. Fixes a 14.02.2 problem where the extra pages of a journal (the second page onward) opened blank when clicked in the page list. MEJ's own page sheets never finished rendering inside a multi-page journal; pages migrated to their MEJ type in 14.02.2 now go through that path. Also gives MEJ's page types readable names in lists such as Configure Default Sheets. Not released by the maintainer; report problems on https://github.com/ironmonk108/monks-enhanced-journal/pull/837 rather than the main issue tracker. Updates go back to the official manifest, so the next official release replaces this one.
